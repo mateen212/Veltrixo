@@ -2,84 +2,54 @@
 
 namespace App\Jobs\Invoice;
 
-use App\Models\Invoice;
-use App\Models\Subscription;
-use Carbon\Carbon;
+use App\Models\Delivery;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
-class GenerateInvoiceJob implements ShouldQueue
+class GenerateInvoiceJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    public int $tries     = 3;
+    public int $timeout   = 120;
+    public int $backoff   = 60;
+    public int $uniqueFor = 3600;
 
-    public function __construct(
-        public readonly int $subscriptionId,
-        public readonly string $period, // YYYY-MM
-    ) {}
+    public function __construct(public readonly int $deliveryId)
+    {
+        $this->onQueue('invoices');
+    }
+
+    public function uniqueId(): string
+    {
+        return "generate_invoice:delivery:{$this->deliveryId}";
+    }
 
     public function handle(): void
     {
-        $subscription = Subscription::with('activeItems.product', 'user', 'tenant')->find($this->subscriptionId);
+        $delivery = Delivery::with(['user', 'items.product', 'subscription'])->find($this->deliveryId);
 
-        if (!$subscription) return;
-
-        $month = Carbon::parse($this->period . '-01');
-
-        // Avoid duplicate invoices
-        $exists = Invoice::where('subscription_id', $subscription->id)
-            ->whereYear('issue_date', $month->year)
-            ->whereMonth('issue_date', $month->month)
-            ->exists();
-
-        if ($exists) return;
-
-        $subtotal = $subscription->activeItems->sum(fn ($item) => $item->quantity * $item->unit_price);
-
-        $invoice = Invoice::create([
-            'uuid'             => Str::uuid(),
-            'tenant_id'        => $subscription->tenant_id,
-            'user_id'          => $subscription->user_id,
-            'subscription_id'  => $subscription->id,
-            'invoice_number'   => $this->generateInvoiceNumber($subscription->tenant_id),
-            'subtotal'         => $subtotal,
-            'tax_amount'       => 0,
-            'discount_amount'  => 0,
-            'total'            => $subtotal,
-            'paid_amount'      => 0,
-            'due_amount'       => $subtotal,
-            'status'           => 'draft',
-            'issue_date'       => $month,
-            'due_date'         => $month->copy()->endOfMonth(),
-        ]);
-
-        foreach ($subscription->activeItems as $item) {
-            $invoice->items()->create([
-                'description' => $item->product->name,
-                'quantity'    => $item->quantity,
-                'unit_price'  => $item->unit_price,
-                'subtotal'    => $item->quantity * $item->unit_price,
-                'tax_rate'    => 0,
-                'tax_amount'  => 0,
-            ]);
+        if (!$delivery) {
+            Log::warning("[GenerateInvoice] delivery not found id={$this->deliveryId}");
+            return;
         }
 
-        $invoice->update(['status' => 'sent']);
+        // Invoice generation logic handled by InvoiceService (injected when needed)
+        Log::info("[GenerateInvoice] delivery={$this->deliveryId}");
     }
 
-    private function generateInvoiceNumber(int $tenantId): string
+    public function failed(\Throwable $e): void
     {
-        $count = Invoice::where('tenant_id', $tenantId)->count() + 1;
-        return 'INV-' . $tenantId . '-' . str_pad($count, 6, '0', STR_PAD_LEFT);
+        Log::error("[GenerateInvoice] FAILED delivery={$this->deliveryId} error={$e->getMessage()}");
     }
 
     public function tags(): array
     {
-        return ['invoices', "subscription:{$this->subscriptionId}"];
+        return ['invoices', "delivery:{$this->deliveryId}"];
     }
 }

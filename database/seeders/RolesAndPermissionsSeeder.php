@@ -10,7 +10,11 @@ class RolesAndPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        // Force the permission cache to use the array store so Redis is never required
+        // (Redis may be absent in dev / CI / plain artisan environments).
+        config(['permission.cache.store' => 'array']);
+        app()->forgetInstance(\Spatie\Permission\PermissionRegistrar::class);
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
         $permissions = [
             // Admin

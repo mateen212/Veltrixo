@@ -4,21 +4,22 @@ use App\Http\Controllers\Admin;
 use App\Http\Controllers\Customer;
 use App\Http\Controllers\Rider;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
+        'canLogin'    => Route::has('login'),
         'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
     ]);
-});
+})->name('home');
 
+// Generic /dashboard → redirects to the correct role dashboard
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    $user = auth()->user();
+    if ($user->hasRole('admin'))  return redirect()->route('admin.dashboard');
+    if ($user->hasRole('rider'))  return redirect()->route('rider.dashboard');
+    return redirect()->route('customer.dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -47,7 +48,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
         Route::post('/{subscription}/resume', [Admin\SubscriptionController::class, 'resume'])->name('resume');
     });
 
-    Route::apiResource('products', Admin\ProductController::class);
+    Route::resource('products', Admin\ProductController::class);
 
     Route::prefix('wallets')->name('wallets.')->group(function () {
         Route::get('/',                                  [Admin\WalletController::class, 'index'])->name('index');
@@ -59,7 +60,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 
 // ─── Customer Portal ─────────────────────────────────────────────────────────
 Route::middleware(['auth', 'verified', 'role:customer'])->prefix('customer')->name('customer.')->group(function () {
-    Route::get('/dashboard', fn () => Inertia::render('Customer/Dashboard'))->name('dashboard');
+    Route::get('/dashboard', Customer\DashboardController::class)->name('dashboard');
 
     Route::prefix('subscriptions')->name('subscriptions.')->group(function () {
         Route::get('/',                       [Customer\SubscriptionController::class, 'index'])->name('index');
@@ -80,7 +81,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])->prefix('customer')->na
 
 // ─── Rider App ───────────────────────────────────────────────────────────────
 Route::middleware(['auth', 'verified', 'role:rider'])->prefix('rider')->name('rider.')->group(function () {
-    Route::get('/dashboard', fn () => Inertia::render('Rider/Dashboard'))->name('dashboard');
+    Route::get('/dashboard', Rider\DashboardController::class)->name('dashboard');
 
     Route::get('/deliveries',              [Rider\DeliveryController::class, 'index'])->name('deliveries.index');
     Route::post('/deliveries/{delivery}/start',    [Rider\DeliveryController::class, 'start'])->name('deliveries.start');

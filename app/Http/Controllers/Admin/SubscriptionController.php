@@ -1,63 +1,63 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\SubscriptionResource;
 use App\Models\Subscription;
-use App\Services\Subscription\SubscriptionService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class SubscriptionController extends Controller
 {
-    public function __construct(private SubscriptionService $service) {}
-
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
-        $subscriptions = Subscription::where('tenant_id', $request->user()->tenant_id)
-            ->with(['user', 'address', 'items.product'])
-            ->orderByDesc('created_at')
-            ->paginate(20);
+        $query = Subscription::with(['user', 'plan'])
+            ->when($request->search, fn($q, $s) => $q->whereHas('user', fn($u) => $u->where('name', 'like', "%$s%")))
+            ->when($request->status, fn($q, $s) => $q->where('status', $s));
+
+        $stats = [
+            'total'     => Subscription::count(),
+            'active'    => Subscription::where('status', 'active')->count(),
+            'paused'    => Subscription::where('status', 'paused')->count(),
+            'cancelled' => Subscription::where('status', 'cancelled')->count(),
+        ];
 
         return Inertia::render('Admin/Subscriptions/Index', [
-            'subscriptions' => SubscriptionResource::collection($subscriptions),
+            'subscriptions' => $query->latest()->paginate(20)->through(fn($s) => [
+                'id'                 => $s->id,
+                'customer_name'      => $s->user?->name ?? '—',
+                'plan_name'          => $s->plan?->name ?? '—',
+                'status'             => $s->status,
+                'start_date'         => $s->start_date?->toDateString(),
+                'next_delivery_date' => $s->next_delivery_date?->toDateString(),
+                'items_count'        => $s->items_count ?? 0,
+            ]),
+            'filters' => $request->only('search', 'status'),
+            'stats'   => $stats,
         ]);
     }
 
-    public function show(Subscription $subscription): Response
+    public function show(Subscription $subscription)
     {
         return Inertia::render('Admin/Subscriptions/Show', [
-            'subscription' => new SubscriptionResource(
-                $subscription->load(['user', 'address', 'items.product', 'deliveries', 'invoices'])
-            ),
+            'subscription' => $subscription->load(['user', 'plan', 'items.product']),
         ]);
     }
 
-    public function cancel(Request $request, Subscription $subscription): JsonResponse
+    public function cancel(Subscription $subscription)
     {
-        $validated = $request->validate(['reason' => ['required', 'string', 'max:500']]);
-
-        return response()->json(['data' => new SubscriptionResource(
-            $this->service->cancel($subscription, $validated['reason'])
-        )]);
+        $subscription->update(['status' => 'cancelled']);
+        return back()->with('success', 'Subscription cancelled.');
     }
 
-    public function pause(Request $request, Subscription $subscription): JsonResponse
+    public function pause(Subscription $subscription)
     {
-        $validated = $request->validate(['pause_until' => ['nullable', 'date', 'after:today']]);
-
-        return response()->json(['data' => new SubscriptionResource(
-            $this->service->pause($subscription, $validated['pause_until'] ?? null)
-        )]);
+        $subscription->update(['status' => 'paused']);
+        return back()->with('success', 'Subscription paused.');
     }
 
-    public function resume(Subscription $subscription): JsonResponse
+    public function resume(Subscription $subscription)
     {
-        return response()->json(['data' => new SubscriptionResource(
-            $this->service->resume($subscription)
-        )]);
+        $subscription->update(['status' => 'active']);
+        return back()->with('success', 'Subscription resumed.');
     }
 }

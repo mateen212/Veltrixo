@@ -1,80 +1,76 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\ProductResource;
-use App\Models\Category;
 use App\Models\Product;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class ProductController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
-        $products = Product::forTenant($request->user()->tenant_id)
-            ->with(['category', 'variants'])
-            ->withCount('subscriptionItems')
-            ->orderBy('sort_order')
-            ->paginate(20);
-
-        $categories = Category::where('tenant_id', $request->user()->tenant_id)->active()->get();
+        $query = Product::query()
+            ->when($request->search, fn($q, $s) => $q->where('name', 'like', "%$s%"))
+            ->when($request->active !== null && $request->active !== '', fn($q) => $q->where('is_active', (bool) $request->active));
 
         return Inertia::render('Admin/Products/Index', [
-            'products'   => ProductResource::collection($products),
-            'categories' => $categories,
+            'products' => $query->latest()->paginate(20)->through(fn($p) => [
+                'id'          => $p->id,
+                'name'        => $p->name,
+                'description' => $p->description,
+                'price'       => number_format($p->price, 2),
+                'category'    => $p->category ?? '—',
+                'unit'        => $p->unit ?? 'unit',
+                'is_active'   => (bool) $p->is_active,
+            ]),
+            'filters' => $request->only('search', 'active'),
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function create() { return Inertia::render('Admin/Products/Create'); }
+
+    public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name'                    => ['required', 'string', 'max:255'],
-            'category_id'             => ['nullable', 'integer', 'exists:categories,id'],
-            'description'             => ['nullable', 'string'],
-            'sku'                     => ['nullable', 'string', 'max:100'],
-            'unit'                    => ['required', 'string', 'max:50'],
-            'price'                   => ['required', 'numeric', 'min:0'],
-            'sale_price'              => ['nullable', 'numeric', 'min:0'],
-            'is_active'               => ['boolean'],
-            'is_subscription_product' => ['boolean'],
-            'is_featured'             => ['boolean'],
-            'sort_order'              => ['integer', 'min:0'],
+        $data = $request->validate([
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price'       => 'required|numeric|min:0',
+            'category'    => 'nullable|string|max:100',
+            'unit'        => 'nullable|string|max:50',
+            'is_active'   => 'boolean',
         ]);
-
-        $validated['tenant_id'] = $request->user()->tenant_id;
-        $validated['slug'] = \Str::slug($validated['name']);
-
-        $product = Product::create($validated);
-
-        return response()->json(['data' => new ProductResource($product)], 201);
+        Product::create($data);
+        return redirect()->route('admin.products.index')->with('success', 'Product created.');
     }
 
-    public function update(Request $request, Product $product): JsonResponse
+    public function show(Product $product)
     {
-        $this->authorize('update', $product);
-
-        $validated = $request->validate([
-            'name'        => ['sometimes', 'string', 'max:255'],
-            'price'       => ['sometimes', 'numeric', 'min:0'],
-            'sale_price'  => ['nullable', 'numeric', 'min:0'],
-            'is_active'   => ['boolean'],
-            'sort_order'  => ['integer'],
-            'description' => ['nullable', 'string'],
-        ]);
-
-        $product->update($validated);
-
-        return response()->json(['data' => new ProductResource($product)]);
+        return Inertia::render('Admin/Products/Show', ['product' => $product]);
     }
 
-    public function destroy(Product $product): JsonResponse
+    public function edit(Product $product)
     {
-        $this->authorize('delete', $product);
+        return Inertia::render('Admin/Products/Edit', ['product' => $product]);
+    }
+
+    public function update(Request $request, Product $product)
+    {
+        $data = $request->validate([
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price'       => 'required|numeric|min:0',
+            'category'    => 'nullable|string|max:100',
+            'unit'        => 'nullable|string|max:50',
+            'is_active'   => 'boolean',
+        ]);
+        $product->update($data);
+        return redirect()->route('admin.products.index')->with('success', 'Product updated.');
+    }
+
+    public function destroy(Product $product)
+    {
         $product->delete();
-        return response()->json(['message' => 'Product deleted.']);
+        return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
     }
 }

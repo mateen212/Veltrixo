@@ -1,84 +1,69 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\WalletResource;
+use App\Models\WalletTransaction;
+use App\Models\WalletRecharge;
 use App\Models\User;
-use App\Models\Wallet;
-use App\Models\WalletRechargeRequest;
-use App\Services\Wallet\WalletService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class WalletController extends Controller
 {
-    public function __construct(private WalletService $walletService) {}
-
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
-        $wallets = Wallet::where('tenant_id', $request->user()->tenant_id)
-            ->with('user')
-            ->orderByDesc('balance')
-            ->paginate(20);
+        $query = WalletTransaction::with('tenant')
+            ->when($request->search, fn($q, $s) => $q->whereHas('tenant', fn($u) => $u->where('name', 'like', "%$s%")))
+            ->when($request->type, fn($q, $t) => $q->where('type', $t));
 
-        $pendingRecharges = WalletRechargeRequest::where('tenant_id', $request->user()->tenant_id)
-            ->where('status', 'pending')
-            ->with('user')
-            ->orderBy('created_at')
-            ->get();
+        $totalIn  = WalletTransaction::where('type', 'credit')->sum('amount');
+        $totalOut = WalletTransaction::where('type', 'debit')->sum('amount');
 
         return Inertia::render('Admin/Wallets/Index', [
-            'wallets'         => WalletResource::collection($wallets),
-            'pendingRecharges' => $pendingRecharges,
+            'transactions' => $query->latest()->paginate(30)->through(fn($t) => [
+                'id'            => $t->id,
+                'customer_name' => $t->tenant?->name ?? '—',
+                'type'          => $t->type,
+                'amount'        => number_format($t->amount, 2),
+                'description'   => $t->description ?? '',
+                'created_at'    => $t->created_at->format('Y-m-d H:i'),
+            ]),
+            'filters' => $request->only('search', 'type'),
+            'stats'   => [
+                'totalIn'  => number_format($totalIn, 2),
+                'totalOut' => number_format($totalOut, 2),
+                'netFlow'  => number_format($totalIn - $totalOut, 2),
+            ],
         ]);
     }
 
-    public function credit(Request $request, User $user): JsonResponse
+    public function credit(Request $request, User $user)
     {
-        $validated = $request->validate([
-            'amount'      => ['required', 'numeric', 'min:1'],
-            'description' => ['required', 'string', 'max:255'],
+        $request->validate(['amount' => 'required|numeric|min:0.01', 'description' => 'nullable|string|max:255']);
+        WalletTransaction::create([
+            'tenant_id'   => $user->id,
+            'type'        => 'credit',
+            'amount'      => $request->amount,
+            'description' => $request->description ?? 'Admin credit',
         ]);
-
-        $transaction = $this->walletService->credit(
-            $user,
-            $validated['amount'],
-            'admin_credit',
-            $validated['description']
-        );
-
-        return response()->json(['data' => $transaction]);
+        return back()->with('success', 'Wallet credited.');
     }
 
-    public function approveRecharge(Request $request, WalletRechargeRequest $recharge): JsonResponse
+    public function approveRecharge(WalletRecharge $recharge)
     {
-        $recharge->update(['status' => 'approved', 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()]);
-
-        $this->walletService->credit(
-            $recharge->user,
-            (float) $recharge->amount,
-            'wallet_recharge',
-            'Wallet recharge approved',
-            ['recharge_id' => $recharge->id]
-        );
-
-        return response()->json(['message' => 'Recharge approved.']);
+        $recharge->update(['status' => 'approved']);
+        WalletTransaction::create([
+            'tenant_id'   => $recharge->tenant_id,
+            'type'        => 'credit',
+            'amount'      => $recharge->amount,
+            'description' => 'Recharge approved',
+        ]);
+        return back()->with('success', 'Recharge approved.');
     }
 
-    public function rejectRecharge(Request $request, WalletRechargeRequest $recharge): JsonResponse
+    public function rejectRecharge(WalletRecharge $recharge)
     {
-        $validated = $request->validate(['reason' => ['required', 'string', 'max:500']]);
-
-        $recharge->update([
-            'status'           => 'rejected',
-            'reviewed_by'      => $request->user()->id,
-            'reviewed_at'      => now(),
-            'rejection_reason' => $validated['reason'],
-        ]);
-
-        return response()->json(['message' => 'Recharge rejected.']);
+        $recharge->update(['status' => 'rejected']);
+        return back()->with('success', 'Recharge rejected.');
     }
 }
