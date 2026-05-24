@@ -10,10 +10,33 @@
       <CalendarIcon class="w-16 h-16 text-gray-300 mx-auto mb-4" />
       <h3 class="text-lg font-medium text-gray-600">No subscriptions yet</h3>
       <p class="text-gray-400 mt-2">Start a subscription to receive regular deliveries.</p>
-      <Link :href="route('customer.subscriptions.store')" class="btn-primary mt-4 inline-block">
-        New Subscription
-      </Link>
+        <button @click="showCreate = true" class="btn-primary mt-4 inline-block">New Subscription</button>
     </div>
+
+      <AppModal v-if="showCreate" title="New Subscription" size="md" @close="showCreate = false">
+        <form @submit.prevent="createSubscription" class="space-y-4">
+          <div>
+            <label class="text-sm font-medium text-gray-700">Frequency</label>
+            <select v-model="form.frequency" class="input-base w-full">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Delivery Address</label>
+            <input v-model="form.address" type="text" class="input-base w-full" />
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Notes (optional)</label>
+            <input v-model="form.notes" type="text" class="input-base w-full" />
+          </div>
+        </form>
+        <template #footer>
+          <button class="btn-outline" @click="showCreate = false">Cancel</button>
+          <button class="btn-primary" @click="createSubscription">Create</button>
+        </template>
+      </AppModal>
 
     <!-- Subscription cards -->
     <div v-else class="space-y-4">
@@ -73,8 +96,20 @@ import { router } from '@inertiajs/vue3'
 import CustomerLayout from '@/Layouts/CustomerLayout.vue'
 import StatusBadge from '@/Components/StatusBadge.vue'
 import { CalendarIcon, MapPinIcon } from '@heroicons/vue/24/outline'
+import { ref } from 'vue'
+import AppModal from '@/Components/AppModal.vue'
+import { useForm } from '@inertiajs/vue3'
 
 defineProps<{ subscriptions: { data: any[] } }>()
+
+const showCreate = ref(false)
+const form = useForm({ frequency: 'weekly', address: '', notes: '' })
+
+async function createSubscription() {
+  form.post(route('customer.subscriptions.store'), {
+    onSuccess: () => { showCreate.value = false; router.reload() },
+  })
+}
 
 async function pause(id: number) {
   const pauseUntil = prompt('Pause until (YYYY-MM-DD), or leave blank:')

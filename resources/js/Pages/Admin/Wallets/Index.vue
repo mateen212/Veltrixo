@@ -18,8 +18,8 @@ const props = defineProps<{
     stats:        { totalIn: string; totalOut: string; netFlow: string }
 }>()
 
-const search  = ref(props.filters.search ?? '')
-const type    = ref(props.filters.type ?? '')
+const search  = ref(props.filters?.search ?? '')
+const type    = ref(props.filters?.type ?? '')
 const loading = ref(false)
 watch([type], () => apply())
 function apply(reset = false) {

@@ -36,10 +36,10 @@ const props = defineProps<{
 }>()
 
 // ── Filters ─────────────────────────────────────────────────
-const search   = ref(props.filters.search ?? '')
-const status   = ref(props.filters.status ?? '')
-const date     = ref(props.filters.date ?? '')
-const riderId  = ref(props.filters.rider_id ?? '')
+const search   = ref(props.filters?.search ?? '')
+const status   = ref(props.filters?.status ?? '')
+const date     = ref(props.filters?.date ?? '')
+const riderId  = ref(props.filters?.rider_id ?? '')
 const loading  = ref(false)
 
 watch([status, date, riderId], () => applyFilters())
@@ -114,14 +114,14 @@ const columns = [
         <!-- Stats strip -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <div v-for="(item, key) in [
-                { label: 'Total',     value: stats.total,     color: 'text-gray-900', bg: 'bg-white' },
-                { label: 'Pending',   value: stats.pending,   color: 'text-amber-700', bg: 'bg-amber-50' },
-                { label: 'Assigned',  value: stats.assigned,  color: 'text-blue-700',  bg: 'bg-blue-50' },
-                { label: 'Completed', value: stats.completed, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                { label: 'Total',     value: stats?.total,     color: 'text-gray-900', bg: 'bg-white' },
+                { label: 'Pending',   value: stats?.pending,   color: 'text-amber-700', bg: 'bg-amber-50' },
+                { label: 'Assigned',  value: stats?.assigned,  color: 'text-blue-700',  bg: 'bg-blue-50' },
+                { label: 'Completed', value: stats?.completed, color: 'text-emerald-700', bg: 'bg-emerald-50' },
             ]" :key="key"
                 :class="['rounded-xl p-4 ring-1 ring-black/5', item.bg]">
                 <p class="text-xs font-medium text-gray-500">{{ item.label }}</p>
-                <p :class="['text-2xl font-bold mt-1', item.color]">{{ item.value.toLocaleString() }}</p>
+                <p :class="['text-2xl font-bold mt-1', item.color]">{{ (item.value ?? 0).toLocaleString() }}</p>
             </div>
         </div>
 

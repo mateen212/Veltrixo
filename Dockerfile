@@ -17,7 +17,7 @@ RUN pecl install redis && docker-php-ext-enable redis
 # Composer
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/delivery-saas
+WORKDIR /var/www/Veltrixo
 
 # Copy application
 COPY . .
@@ -29,9 +29,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN npm ci && npm run build && rm -rf node_modules
 
 # Permissions
-RUN chown -R www-data:www-data /var/www/delivery-saas \
- && chmod -R 755 /var/www/delivery-saas/storage \
- && chmod -R 755 /var/www/delivery-saas/bootstrap/cache
+RUN chown -R www-data:www-data /var/www/Veltrixo \
+ && chmod -R 755 /var/www/Veltrixo/storage \
+ && chmod -R 755 /var/www/Veltrixo/bootstrap/cache
 
 # PHP OPcache config
 RUN { \
@@ -42,7 +42,7 @@ RUN { \
 } > /usr/local/etc/php/conf.d/opcache.ini
 
 # Copy configs
-COPY docker/nginx/delivery-saas.conf /etc/nginx/http.d/default.conf
+COPY docker/nginx/Veltrixo.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisor/supervisord.conf /etc/supervisord.conf
 
 EXPOSE 80 8080

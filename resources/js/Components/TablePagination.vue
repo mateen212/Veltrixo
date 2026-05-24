@@ -14,9 +14,22 @@ const props = defineProps<{
     links?: Array<{ url: string | null; label: string; active: boolean } | null> | null
 }>()
 
-const safeLinks = computed(() =>
-    (props.links ?? []).filter((l): l is { url: string | null; label: string; active: boolean } => l !== null)
-)
+const safeLinks = computed(() => {
+    const raw = props.links ?? []
+    if (Array.isArray(raw)) {
+        return raw.filter((l): l is { url: string | null; label: string; active: boolean } => l !== null)
+    }
+    if (raw && typeof raw === 'object') {
+        return Object.values(raw)
+            .filter(Boolean)
+            .map((l: any) => ({
+                url: l?.url ?? null,
+                label: String(l?.label ?? ''),
+                active: Boolean(l?.active ?? false),
+            }))
+    }
+    return []
+})
 </script>
 <template>
     <div v-if="meta" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-gray-100 bg-white">

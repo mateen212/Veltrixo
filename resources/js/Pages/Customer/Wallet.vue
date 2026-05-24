@@ -101,7 +101,7 @@ function submitRecharge() {
         </div>
 
         <!-- Recharge Modal -->
-        <AppModal :show="showRecharge" title="Recharge Wallet" @close="showRecharge = false">
+        <AppModal v-if="showRecharge" title="Recharge Wallet" @close="showRecharge = false">
             <form @submit.prevent="submitRecharge" class="space-y-4">
                 <div class="flex flex-col gap-1">
                     <label class="text-sm font-medium text-gray-700">Amount (₹)</label>

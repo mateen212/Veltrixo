@@ -18,8 +18,8 @@ const props = defineProps<{
     stats: { active: number; paused: number; cancelled: number; total: number }
 }>()
 
-const search  = ref(props.filters.search ?? '')
-const status  = ref(props.filters.status ?? '')
+const search  = ref(props.filters?.search ?? '')
+const status  = ref(props.filters?.status ?? '')
 const loading = ref(false)
 
 watch([status], () => apply())
