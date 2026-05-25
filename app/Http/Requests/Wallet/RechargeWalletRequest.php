@@ -15,7 +15,7 @@ class RechargeWalletRequest extends FormRequest
     {
         return [
             'amount'            => ['required', 'numeric', 'min:1', 'max:100000'],
-            'payment_method'    => ['required', 'string', 'in:bank_transfer,cash,upi,card'],
+            'payment_method'    => ['required', 'string', 'in:jazzcash,easypaisa,bank_transfer,cash,card'],
             'payment_reference' => ['nullable', 'string', 'max:100'],
             'receipt_image'     => ['nullable', 'image', 'max:5120'],
             'notes'             => ['nullable', 'string', 'max:500'],

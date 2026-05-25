@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TenantSubscription extends Model
 {
+    use HasTenant;
     protected $fillable = [
         'tenant_id', 'plan_id', 'billing_cycle', 'status',
         'starts_at', 'ends_at', 'trial_ends_at', 'cancelled_at', 'amount', 'meta',

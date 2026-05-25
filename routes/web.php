@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\Customer;
 use App\Http\Controllers\Rider;
+use App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -17,8 +18,9 @@ Route::get('/', function () {
 // Generic /dashboard → redirects to the correct role dashboard
 Route::get('/dashboard', function () {
     $user = auth()->user();
-    if ($user->hasRole('admin'))  return redirect()->route('admin.dashboard');
-    if ($user->hasRole('rider'))  return redirect()->route('rider.dashboard');
+    if ($user->hasRole('super_admin')) return redirect()->route('super-admin.dashboard');
+    if ($user->hasRole('admin'))       return redirect()->route('admin.dashboard');
+    if ($user->hasRole('rider'))       return redirect()->route('rider.dashboard');
     return redirect()->route('customer.dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -26,6 +28,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+// ─── Super Admin Panel ───────────────────────────────────────────────────────
+Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin')->name('super-admin.')->group(function () {
+    Route::get('/dashboard', SuperAdmin\DashboardController::class)->name('dashboard');
+    Route::get('/tenants',   [SuperAdmin\TenantController::class, 'index'])->name('tenants.index');
+    Route::post('/tenants',  [SuperAdmin\TenantController::class, 'store'])->name('tenants.store');
+    Route::get('/tenants/{tenant}',  [SuperAdmin\TenantController::class, 'show'])->name('tenants.show');
+    Route::patch('/tenants/{tenant}/suspend',    [SuperAdmin\TenantController::class, 'suspend'])->name('tenants.suspend');
+    Route::patch('/tenants/{tenant}/reactivate', [SuperAdmin\TenantController::class, 'reactivate'])->name('tenants.reactivate');
 });
 
 // ─── Admin Panel ─────────────────────────────────────────────────────────────
@@ -53,9 +65,19 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::prefix('wallets')->name('wallets.')->group(function () {
         Route::get('/',                                  [Admin\WalletController::class, 'index'])->name('index');
         Route::post('/users/{user}/credit',              [Admin\WalletController::class, 'credit'])->name('credit');
-        Route::post('/recharges/{recharge}/approve',     [Admin\WalletController::class, 'approveRecharge'])->name('recharges.approve');
-        Route::post('/recharges/{recharge}/reject',      [Admin\WalletController::class, 'rejectRecharge'])->name('recharges.reject');
+        Route::patch('/recharges/{recharge}/approve',    [Admin\WalletController::class, 'approveRecharge'])->name('recharges.approve');
+        Route::patch('/recharges/{recharge}/reject',     [Admin\WalletController::class, 'rejectRecharge'])->name('recharges.reject');
     });
+
+    Route::prefix('riders')->name('riders.')->group(function () {
+        Route::get('/',             [Admin\RiderController::class, 'index'])->name('index');
+        Route::post('/',            [Admin\RiderController::class, 'store'])->name('store');
+        Route::get('/{rider}',      [Admin\RiderController::class, 'show'])->name('show');
+        Route::patch('/{rider}',    [Admin\RiderController::class, 'update'])->name('update');
+        Route::delete('/{rider}',   [Admin\RiderController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::get('/analytics', Admin\AnalyticsController::class)->name('analytics');
 });
 
 // ─── Customer Portal ─────────────────────────────────────────────────────────

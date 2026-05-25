@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Announcement extends Model
 {
+    use HasTenant;
     protected $fillable = [
         'tenant_id', 'created_by', 'title', 'message', 'type',
         'target_roles', 'is_active', 'publish_at', 'expires_at',

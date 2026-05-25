@@ -31,7 +31,7 @@ const props = defineProps<{
 const fmt = (n: number | undefined | null) => (+(n ?? 0)).toFixed(2)
 
 const showRecharge = ref(false)
-const form = useForm({ amount: 500, payment_method: 'upi', payment_reference: '' })
+const form = useForm({ amount: 500, payment_method: 'jazzcash', payment_reference: '' })
 
 function submitRecharge() {
     form.post(route('customer.wallet.recharge'), {
@@ -52,18 +52,18 @@ function submitRecharge() {
                     <BanknotesIcon class="h-4 w-4 text-indigo-200" />
                     <p class="text-sm text-indigo-200 font-medium">Available Balance</p>
                 </div>
-                <p class="text-4xl font-bold tracking-tight">₹{{ fmt(wallet?.balance) }}</p>
+                <p class="text-4xl font-bold tracking-tight">Rs {{ fmt(wallet?.balance) }}</p>
                 <div v-if="wallet?.is_below_threshold" class="mt-3 inline-flex items-center gap-1.5 bg-yellow-400/20 rounded-lg px-3 py-1.5 text-xs text-yellow-200 font-medium">
                     ⚠ Low balance — recharge to avoid interruption
                 </div>
                 <div class="flex gap-6 mt-4 pt-4 border-t border-white/10 text-sm text-indigo-200">
                     <div class="flex items-center gap-1.5">
                         <ArrowUpCircleIcon class="h-4 w-4 text-emerald-300" />
-                        <span>Credited: ₹{{ fmt(wallet?.total_credited) }}</span>
+                        <span>Credited: Rs {{ fmt(wallet?.total_credited) }}</span>
                     </div>
                     <div class="flex items-center gap-1.5">
                         <ArrowDownCircleIcon class="h-4 w-4 text-red-300" />
-                        <span>Debited: ₹{{ fmt(wallet?.total_debited) }}</span>
+                        <span>Debited: Rs {{ fmt(wallet?.total_debited) }}</span>
                     </div>
                 </div>
             </div>
@@ -93,7 +93,7 @@ function submitRecharge() {
                         <p class="text-xs text-gray-400 mt-0.5">{{ new Date(tx.created_at).toLocaleString() }}</p>
                     </div>
                     <span :class="['text-sm font-semibold', tx.type === 'credit' ? 'text-emerald-600' : 'text-red-500']">
-                        {{ tx.type === 'credit' ? '+' : '-' }}₹{{ tx.amount }}
+                        {{ tx.type === 'credit' ? '+' : '-' }}Rs {{ tx.amount }}
                     </span>
                 </div>
             </div>
@@ -104,7 +104,7 @@ function submitRecharge() {
         <AppModal v-if="showRecharge" title="Recharge Wallet" @close="showRecharge = false">
             <form @submit.prevent="submitRecharge" class="space-y-4">
                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-gray-700">Amount (₹)</label>
+                    <label class="text-sm font-medium text-gray-700">Amount (Rs)</label>
                     <input v-model.number="form.amount" type="number" min="1"
                         class="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" required />
                     <p v-if="form.errors.amount" class="text-xs text-red-600">{{ form.errors.amount }}</p>
@@ -113,10 +113,11 @@ function submitRecharge() {
                     <label class="text-sm font-medium text-gray-700">Payment Method</label>
                     <select v-model="form.payment_method"
                         class="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40">
-                        <option value="upi">UPI</option>
+                        <option value="jazzcash">JazzCash</option>
+                        <option value="easypaisa">EasyPaisa</option>
                         <option value="bank_transfer">Bank Transfer</option>
                         <option value="cash">Cash</option>
-                        <option value="card">Card</option>
+                        <option value="card">Debit/Credit Card</option>
                     </select>
                 </div>
                 <div class="flex flex-col gap-1">

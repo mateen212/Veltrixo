@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/vue3'
 import AppToast from '@/Components/AppToast.vue'
 import {
     ChartBarSquareIcon, TruckIcon, CalendarDaysIcon,
-    ShoppingBagIcon, WalletIcon,
+    ShoppingBagIcon, WalletIcon, UserGroupIcon, PresentationChartLineIcon,
     Bars3Icon, XMarkIcon, BellIcon, ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -25,6 +25,8 @@ const navItems = [
     { label: 'Subscriptions', href: 'admin.subscriptions.index',   icon: CalendarDaysIcon },
     { label: 'Products',      href: 'admin.products.index',        icon: ShoppingBagIcon },
     { label: 'Wallets',       href: 'admin.wallets.index',         icon: WalletIcon },
+    { label: 'Riders',        href: 'admin.riders.index',          icon: UserGroupIcon },
+    { label: 'Analytics',     href: 'admin.analytics',             icon: PresentationChartLineIcon },
 ]
 
 function isActive(routeName: string) {

@@ -46,10 +46,10 @@ class DemoDataSeeder extends Seeder
 
         // Demo customer
         $customer = User::firstOrCreate(
-            ['email' => 'customer@demo.com'],
+            ['email' => 'customer@demo.test'],
             [
                 'name'              => 'Demo Customer',
-                'phone'             => '+919999000002',
+                'phone'             => '+923001234567',
                 'password'          => bcrypt('password'),
                 'tenant_id'         => $tenant->id,
                 'email_verified_at' => now(),
@@ -59,10 +59,10 @@ class DemoDataSeeder extends Seeder
 
         // Demo rider user
         $riderUser = User::firstOrCreate(
-            ['email' => 'rider@demo.com'],
+            ['email' => 'rider@demo.test'],
             [
                 'name'              => 'Demo Rider',
-                'phone'             => '+919999000003',
+                'phone'             => '+923011234567',
                 'password'          => bcrypt('password'),
                 'tenant_id'         => $tenant->id,
                 'email_verified_at' => now(),
@@ -72,9 +72,9 @@ class DemoDataSeeder extends Seeder
 
         Rider::firstOrCreate(
             ['user_id' => $riderUser->id, 'tenant_id' => $tenant->id],
-            ['vehicle_type' => 'bike', 'vehicle_number' => 'MH01AB1234', 'status' => 'active']
+            ['vehicle_type' => 'bike', 'vehicle_number' => 'LEA-12-3456', 'status' => 'active']
         );
 
-        $this->command->info('Demo data seeded: 1 admin, 1 customer, 1 rider, 3 products.');
+        $this->command->info('Demo data seeded: 1 admin, 1 customer, 1 rider, 3 products. Login: customer@demo.test / password');
     }
 }

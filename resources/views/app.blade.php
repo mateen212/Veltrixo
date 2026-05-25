@@ -3,8 +3,13 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#6366f1">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'Veltrixo') }}</title>
+
+        <!-- PWA manifest -->
+        <link rel="manifest" href="/manifest.json">
+        <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -17,5 +22,16 @@
     </head>
     <body class="font-sans antialiased">
         @inertia
+
+        <!-- PWA service worker registration -->
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function () {
+                    navigator.serviceWorker.register('/sw.js').catch(function (err) {
+                        console.warn('SW registration failed:', err);
+                    });
+                });
+            }
+        </script>
     </body>
 </html>

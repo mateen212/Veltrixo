@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DeliveryItem extends Model
 {
+    use HasTenant;
     protected $fillable = [
         'delivery_id', 'product_id', 'variant_id', 'product_name',
         'quantity', 'unit_price', 'subtotal', 'is_delivered',

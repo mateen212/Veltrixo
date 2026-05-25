@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Delivery extends Model implements HasMedia
 {
+    use HasTenant;
     use HasFactory, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [

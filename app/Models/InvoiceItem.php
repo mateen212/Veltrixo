@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InvoiceItem extends Model
 {
+    use HasTenant;
     protected $fillable = [
         'invoice_id', 'description', 'quantity', 'unit_price',
         'subtotal', 'tax_rate', 'tax_amount',

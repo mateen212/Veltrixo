@@ -39,9 +39,13 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
-        $admin = Role::firstOrCreate(['name' => 'admin',    'guard_name' => 'web']);
-        $rider = Role::firstOrCreate(['name' => 'rider',    'guard_name' => 'web']);
-        $customer = Role::firstOrCreate(['name' => 'customer', 'guard_name' => 'web']);
+        $superAdmin = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']);
+        $admin      = Role::firstOrCreate(['name' => 'admin',       'guard_name' => 'web']);
+        $rider      = Role::firstOrCreate(['name' => 'rider',       'guard_name' => 'web']);
+        $customer   = Role::firstOrCreate(['name' => 'customer',    'guard_name' => 'web']);
+
+        // Super admin gets all permissions
+        $superAdmin->syncPermissions(Permission::all());
 
         $admin->syncPermissions([
             'view admin dashboard', 'manage deliveries', 'manage subscriptions',

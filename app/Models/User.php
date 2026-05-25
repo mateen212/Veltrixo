@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasWallet;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -22,6 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
     use HasRoles, CausesActivity, LogsActivity, InteractsWithMedia;
+    use HasWallet;
 
     protected $fillable = [
         'tenant_id', 'name', 'email', 'password', 'phone', 'avatar',

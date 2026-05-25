@@ -12,10 +12,10 @@ class TenantSeeder extends Seeder
     public function run(): void
     {
         $owner = User::firstOrCreate(
-            ['email' => 'owner@demo.com'],
+            ['email' => 'admin@demo.test'],
             [
-                'name'              => 'Demo Owner',
-                'phone'             => '+919999000001',
+                'name'              => 'Demo Admin',
+                'phone'             => '+923009876543',
                 'password'          => bcrypt('password'),
                 'email_verified_at' => now(),
             ]

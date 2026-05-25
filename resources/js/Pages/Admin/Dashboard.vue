@@ -71,7 +71,7 @@ const from = ref(props.from)
 const to   = ref(props.to)
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value)
+  return 'Rs ' + new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)
 }
 
 function reload() {

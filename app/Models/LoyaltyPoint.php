@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LoyaltyPoint extends Model
 {
+    use HasTenant;
     protected $fillable = [
         'tenant_id', 'user_id', 'type', 'points', 'balance_after',
         'description', 'reference_type', 'reference_id', 'expires_at',

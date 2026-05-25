@@ -119,7 +119,7 @@ Veltrixo does exactly that. One installation can power **multiple completely iso
 
 ### Customer Portal
 - **Subscription management** — full self-service
-- **Wallet top-up** — UPI, bank transfer, cash
+- **Wallet top-up** — JazzCash, EasyPaisa, bank transfer, cash, debit/credit card
 - **Delivery history** — with invoice downloads (PDF)
 - **Loyalty points** — earn on every delivery
 - **Referral system** — earn credit for referrals
@@ -315,7 +315,7 @@ The Admin is the business owner or operations manager for a specific tenant. The
 7. At end of day, reviews missed deliveries and takes action (reschedule/refund)
 
 **Wallet management:**
-1. Customer submits a recharge request (Rs 500 via UPI)
+1. Customer submits a recharge request (Rs 500 via JazzCash)
 2. Admin sees pending requests at `/admin/wallets`
 3. Verifies payment proof/reference number
 4. Approves → system credits customer wallet instantly
@@ -424,7 +424,7 @@ The Customer is the end consumer — they interact with the platform to manage t
 1. Customer goes to `/customer/wallet`
 2. Sees current balance (e.g. Rs 1,240.00)
 3. Taps **Recharge Wallet**
-4. Enters amount (Rs 1,000), selects payment method (UPI/bank transfer/cash)
+4. Enters amount (Rs 1,000), selects payment method (JazzCash/EasyPaisa/bank transfer/cash)
 5. Enters transaction reference/UTR number
 6. Submits → admin receives notification to verify
 7. Admin approves → Rs 1,000 credited within minutes

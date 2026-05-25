@@ -48,7 +48,7 @@
             <p class="text-sm text-gray-500 mt-1">Next: {{ sub.next_delivery_date ?? '—' }}</p>
           </div>
           <div class="text-right">
-            <p class="text-lg font-bold text-gray-800">₹{{ sub.total_amount }}</p>
+            <p class="text-lg font-bold text-gray-800">Rs {{ sub.total_amount }}</p>
             <p class="text-xs text-gray-400">per delivery</p>
           </div>
         </div>
@@ -57,7 +57,7 @@
         <div class="bg-gray-50 rounded-lg p-3 mb-4">
           <div v-for="item in sub.items" :key="item.id" class="flex justify-between text-sm py-1">
             <span class="text-gray-700">{{ item.product?.name }} × {{ item.quantity }}</span>
-            <span class="text-gray-600 font-medium">₹{{ item.subtotal }}</span>
+            <span class="text-gray-600 font-medium">Rs {{ item.subtotal }}</span>
           </div>
         </div>
 

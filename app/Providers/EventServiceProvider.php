@@ -13,8 +13,11 @@ use App\Events\Wallet\WalletCredited;
 use App\Events\Wallet\WalletDebited;
 use App\Listeners\Delivery\SendDeliveryAssignedNotification;
 use App\Listeners\Delivery\SendDeliveryCompletedNotification;
+use App\Listeners\Delivery\SendDeliveryMissedNotification;
 use App\Listeners\Subscription\SendSubscriptionConfirmation;
+use App\Listeners\Subscription\SendSubscriptionPausedNotification;
 use App\Listeners\Wallet\SendLowBalanceNotification;
+use App\Listeners\Wallet\SendWalletCreditedNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -23,7 +26,9 @@ class EventServiceProvider extends ServiceProvider
         SubscriptionCreated::class => [
             SendSubscriptionConfirmation::class,
         ],
-        SubscriptionPaused::class => [],
+        SubscriptionPaused::class => [
+            SendSubscriptionPausedNotification::class,
+        ],
         SubscriptionCancelled::class => [],
 
         DeliveryAssigned::class => [
@@ -32,9 +37,13 @@ class EventServiceProvider extends ServiceProvider
         DeliveryCompleted::class => [
             SendDeliveryCompletedNotification::class,
         ],
-        DeliveryMissed::class => [],
+        DeliveryMissed::class => [
+            SendDeliveryMissedNotification::class,
+        ],
 
-        WalletCredited::class => [],
+        WalletCredited::class => [
+            SendWalletCreditedNotification::class,
+        ],
         WalletDebited::class  => [],
         LowBalanceDetected::class => [
             SendLowBalanceNotification::class,
