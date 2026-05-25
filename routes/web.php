@@ -38,6 +38,11 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin
     Route::get('/tenants/{tenant}',  [SuperAdmin\TenantController::class, 'show'])->name('tenants.show');
     Route::patch('/tenants/{tenant}/suspend',    [SuperAdmin\TenantController::class, 'suspend'])->name('tenants.suspend');
     Route::patch('/tenants/{tenant}/reactivate', [SuperAdmin\TenantController::class, 'reactivate'])->name('tenants.reactivate');
+    // Tenant plans management (create/edit/delete)
+    Route::get('/plans', [SuperAdmin\PlanController::class, 'index'])->name('plans.index');
+    Route::post('/plans', [SuperAdmin\PlanController::class, 'store'])->name('plans.store');
+    Route::patch('/plans/{plan}', [SuperAdmin\PlanController::class, 'update'])->name('plans.update');
+    Route::delete('/plans/{plan}', [SuperAdmin\PlanController::class, 'destroy'])->name('plans.destroy');
 });
 
 // ─── Admin Panel ─────────────────────────────────────────────────────────────

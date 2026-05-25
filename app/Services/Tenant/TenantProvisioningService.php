@@ -30,28 +30,42 @@ class TenantProvisioningService
                 'email_verified_at' => now(),
             ]);
 
-            // Create the tenant
+            // Create the tenant (only provided fields filled; others left as defaults)
             $tenant = Tenant::create([
-                'name'          => $data['business_name'],
-                'slug'          => Str::slug($data['business_name']) . '-' . Str::random(4),
-                'owner_id'      => $adminUser->id,
-                'email'         => $data['owner_email'],
-                'phone'         => $data['owner_phone'] ?? null,
-                'status'        => 'active',
-                'trial_ends_at' => now()->addDays((int) ($data['trial_days'] ?? 30)),
-                'settings'      => [],
+                'name'            => $data['business_name'],
+                'slug'            => Str::slug($data['business_name']) . '-' . Str::random(4),
+                'owner_id'        => $adminUser->id,
+                'email'           => $data['owner_email'],
+                'phone'           => $data['owner_phone'] ?? null,
+                'domain'          => $data['domain'] ?? null,
+                'subdomain'       => $data['subdomain'] ?? null,
+                'status'          => $data['status'] ?? 'active',
+                'trial_ends_at'   => now()->addDays((int) ($data['trial_days'] ?? 30)),
+                'settings'        => $data['settings'] ?? [],
+                'branding'        => $data['branding'] ?? [],
+                'address'         => $data['address'] ?? [],
+                'currency'        => $data['currency'] ?? 'PKR',
+                'currency_symbol' => $data['currency_symbol'] ?? 'Rs',
+                'timezone'        => $data['timezone'] ?? config('app.timezone'),
+                'locale'          => $data['locale'] ?? config('app.locale'),
+                'features'        => $data['features'] ?? [],
+                'limits'          => $data['limits'] ?? [],
+                'meta'            => $data['meta'] ?? [],
             ]);
 
             // Link admin user to tenant
             $adminUser->update(['tenant_id' => $tenant->id]);
             $adminUser->assignRole('admin');
 
-            // Subscribe tenant to plan
+            // Subscribe tenant to plan (use model field names)
             $tenant->tenantSubscription()->create([
-                'plan_id'    => $plan->id,
-                'status'     => 'trialing',
-                'started_at' => now(),
-                'ends_at'    => now()->addDays((int) ($data['trial_days'] ?? 30)),
+                'plan_id'      => $plan->id,
+                'status'       => 'trialing',
+                'billing_cycle'=> $data['billing_cycle'] ?? 'monthly',
+                'starts_at'    => now(),
+                'ends_at'      => now()->addDays((int) ($data['trial_days'] ?? 30)),
+                'amount'       => $data['amount'] ?? $plan->price_monthly ?? 0,
+                'meta'         => $data['subscription_meta'] ?? [],
             ]);
 
             return [

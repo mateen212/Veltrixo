@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+
 use App\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Model;
@@ -10,8 +11,16 @@ class TenantSubscription extends Model
 {
     use HasTenant;
     protected $fillable = [
-        'tenant_id', 'plan_id', 'billing_cycle', 'status',
-        'starts_at', 'ends_at', 'trial_ends_at', 'cancelled_at', 'amount', 'meta',
+        'tenant_id',
+        'plan_id',
+        'billing_cycle',
+        'status',
+        'starts_at',
+        'ends_at',
+        'trial_ends_at',
+        'cancelled_at',
+        'amount',
+        'meta',
     ];
 
     protected $casts = [
@@ -23,8 +32,17 @@ class TenantSubscription extends Model
         'meta'          => 'array',
     ];
 
-    public function tenant(): BelongsTo { return $this->belongsTo(Tenant::class); }
-    public function plan(): BelongsTo { return $this->belongsTo(TenantPlan::class, 'plan_id'); }
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(TenantPlan::class, 'plan_id');
+    }
 
-    public function isActive(): bool { return $this->status === 'active'; }
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
 }

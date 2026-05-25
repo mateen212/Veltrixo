@@ -21,6 +21,7 @@ const initials = computed(() => {
 const navItems = [
     { label: 'Dashboard', href: 'super-admin.dashboard',      icon: HomeIcon },
     { label: 'Tenants',   href: 'super-admin.tenants.index',  icon: BuildingOfficeIcon },
+    { label: 'Plans',     href: 'super-admin.plans.index',    icon: ChartBarSquareIcon },
 ]
 
 function isActive(routeName: string) {
