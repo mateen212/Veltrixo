@@ -11,9 +11,9 @@
 [![Tailwind CSS 3](https://img.shields.io/badge/Tailwind-3.x-38bdf8?logo=tailwindcss)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Production-grade SaaS platform for recurring delivery businesses — dairy farms, meal kits, grocery boxes, water delivery, and more. Fully multi-tenant, role-based, wallet-driven, and real-time.**
+**Production-grade SaaS platform for recurring delivery businesses — dairy farms, meal kits, grocery boxes, water delivery, and more. Fully multi-tenant, subdomain-routed, role-based, wallet-driven, and real-time.**
 
-[Live Demo](#) · [API Docs](#) · [Architecture Diagram](#) · [Changelog](#)
+[Live Demo](#) · [API Docs](#) · [Architecture Diagram](#architecture-overview) · [Changelog](#)
 
 </div>
 
@@ -25,8 +25,10 @@
 - [Key Features](#key-features)
 - [Screenshots](#screenshots)
 - [Architecture Overview](#architecture-overview)
+- [Subdomain Multi-Tenancy](#subdomain-multi-tenancy)
 - [Tech Stack](#tech-stack)
 - [Business Workflows](#business-workflows)
+  - [Business Signup & Verification](#business-signup--verification)
   - [Super Admin](#super-admin-flow)
   - [Admin / Manager](#admin--manager-flow)
   - [Rider](#rider-flow)
@@ -49,6 +51,7 @@
 - [API Architecture](#api-architecture)
 - [Performance Optimizations](#performance-optimizations)
 - [Scaling & Future Roadmap](#scaling--future-roadmap)
+- [End-to-End Testing Flow](#end-to-end-testing-flow-json-graph)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -60,7 +63,7 @@ Veltrixo is a **production-ready, multi-tenant SaaS platform** purpose-built for
 
 It solves a real operational problem: **how do you manage hundreds of customers, each with different delivery frequencies, custom product mixes, flexible pause/skip rules, wallet balances, and a fleet of riders — reliably, every single day?**
 
-Veltrixo does exactly that. One installation can power **multiple completely isolated businesses (tenants)**, each with their own customers, riders, products, pricing, and analytics. Each business pays Veltrixo on a SaaS plan, and the platform handles everything else.
+Veltrixo does exactly that. One installation can power **multiple completely isolated businesses (tenants)**, each with their own subdomain (`alnoor.veltrixo.com`), customers, riders, products, pricing, and analytics. Each business signs up through the public registration portal, goes through admin verification, and — once approved — gets their own branded subdomain portal instantly.
 
 ### Who uses it?
 
@@ -78,16 +81,18 @@ Veltrixo does exactly that. One installation can power **multiple completely iso
 ## Key Features
 
 ### Platform (SaaS Layer)
-- **True multi-tenancy** — fully isolated data per business
-- **SaaS subscription plans** for tenant billing (Basic, Pro, Enterprise)
-- **Tenant onboarding** — instant account provisioning
-- **Platform-wide analytics** — revenue, active tenants, churn
+- **Subdomain multi-tenancy** — every business gets `{slug}.veltrixo.com`
+- **Self-service business signup** — 3-step wizard with GPS location + Leaflet map
+- **Verification workflow** — super admin reviews, approves or rejects with reason
+- **SaaS subscription plans** — Basic, Pro, Enterprise with feature limits
+- **Instant tenant portal activation** — subdomain live the moment admin approves
+- **Platform-wide analytics** — revenue, active tenants, churn across all businesses
 
 ### Subscription Engine
 - **Flexible frequencies** — daily, weekly, bi-weekly, monthly
 - **Custom product mix** per subscription (e.g. 2 litres milk + 1 yoghurt)
 - **Pause & resume** — customer pauses during vacation
-- **Skip individual dates** — skip next Monday's delivery
+- **Skip individual dates** — skip next Monday's delivery only
 - **Product swaps** — change items without cancelling
 - **Auto-renewal** — subscriptions renew automatically
 - **Delivery cut-off rules** — configurable per tenant
@@ -130,6 +135,7 @@ Veltrixo does exactly that. One installation can power **multiple completely iso
 - **Server-side rendering (SSR)** via Inertia.js + Vue 3
 - **Real-time events** via Laravel Reverb (WebSockets)
 - **Background jobs** via Laravel Horizon (Redis queues)
+- **Tenant-aware queue jobs** — `WithTenantContext` middleware restores tenant per job
 - **Activity logging** via Spatie ActivityLog
 - **Media uploads** via Spatie MediaLibrary + S3
 - **PDF generation** via barryvdh/laravel-dompdf
@@ -151,78 +157,148 @@ Veltrixo does exactly that. One installation can power **multiple completely iso
 
 ## Architecture Overview
 
+```
+┌─────────────────────────────────────────────────────────┐
+│                    VELTRIXO PLATFORM                     │
+│                                                         │
+│  Browser: alnoor.veltrixo.com   veltrixo.com (admin)    │
+│              │                          │               │
+│  ┌───────────▼──────────────────────────▼─────────┐     │
+│  │         Nginx  (wildcard *.veltrixo.com)        │     │
+│  └───────────────────────┬─────────────────────────┘     │
+│                          ▼                              │
+│  ┌────────────────────────────────────────────────┐     │
+│  │  Laravel 13 (PHP-FPM)  +  Inertia.js SSR       │     │
+│  │                                                │     │
+│  │  InitializeTenancyBySubdomain (global)         │     │
+│  │  → TenantContext::set($tenant)                 │     │
+│  │                                                │     │
+│  │  ┌─────────────┐   ┌──────────────────────┐   │     │
+│  │  │Central Routes│   │Tenant Subdomain Routes│   │     │
+│  │  │veltrixo.com  │   │{subdomain}.veltrix.. │   │     │
+│  │  │Super Admin   │   │Admin / Rider / Customer│   │     │
+│  │  └─────────────┘   └──────────────────────┘   │     │
+│  └──────────────────┬───────────────┬─────────────┘     │
+│                     │               │                   │
+│          ┌──────────▼──┐    ┌───────▼───────────┐      │
+│          │  MySQL 8    │    │  Laravel Reverb    │      │
+│          │ (row-level  │    │  WebSocket :8080   │      │
+│          │  isolation) │    └───────────────────┘      │
+│          └─────────────┘                               │
+│          ┌─────────────┐    ┌───────────────────┐      │
+│          │  Redis 7    │    │  S3 Object Storage │      │
+│          │ Cache+Queue │    │  Media + Invoices  │      │
+│          └──────┬──────┘    └───────────────────┘      │
+│                 ▼                                       │
+│          ┌─────────────┐                               │
+│          │Laravel Horizon│                              │
+│          │Queue Workers │                              │
+│          └─────────────┘                               │
+└─────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## Subdomain Multi-Tenancy
 
-Every approved business gets a unique subdomain: `{slug}.veltrixo.com`.
+Every approved business gets a unique subdomain: `{subdomain}.veltrixo.com`
 
-### How it works
+Example: a business named "Al Noor Dairy" with subdomain `alnoor` is accessible at `alnoor.veltrixo.com`.
+
+### Request resolution flow
 
 ```
 Request: freshmilk.veltrixo.com/admin/dashboard
          │
          ▼
-   Nginx (wildcard *.veltrixo.com)
+   Nginx (*.veltrixo.com wildcard)
+   → passes Host header to PHP-FPM
          │
          ▼
    InitializeTenancyBySubdomain   ← global web middleware
-   • extracts "freshmilk" from Host header
+   • extracts "freshmilk" from $request->getHost()
    • finds Tenant where subdomain = "freshmilk"
-   • calls TenantContext::set($tenant)
+   • TenantContext::set($tenant)
    • unknown subdomain → 404 Errors/TenantNotFound
          │
          ▼
    require.tenant middleware       ← all tenant domain routes
-   • ensures TenantContext is set
+   • ensures TenantContext has a tenant
          │
          ▼
    tenant.active middleware
-   • suspended  → 403 Errors/TenantSuspended
-   • pending    → 403 Business/Pending
-   • rejected   → 403 Errors/TenantNotFound
+   • suspended        → 403 Errors/TenantSuspended
+   • pending_verif.   → 403 Business/Pending
+   • rejected         → 403 Errors/TenantNotFound
          │
          ▼
-   tenant.user middleware          ← authenticated routes only
-   • verifies auth user belongs to this tenant
-   • cross-tenant access → logout + redirect to correct domain
-   • super_admin role is exempt (can inspect all tenants)
+   tenant.user middleware          ← authenticated routes
+   • checks auth()->user()->tenant_id === TenantContext::get()->id
+   • mismatch → logout + redirect to correct subdomain
+   • super_admin role is exempt (can inspect any tenant)
          │
          ▼
-   Controller
+   Controller handles request
 ```
 
 ### Central domain (veltrixo.com)
 
-Super admin panel and public pages live on the root domain, protected by `only.central` middleware which aborts 404 if a tenant subdomain is detected.
+The super admin panel and public pages live on the root domain, protected by `only.central` middleware — if a tenant subdomain is detected, it aborts 404. This ensures tenant users cannot access the super admin panel even if they guess the URL.
 
-### Middleware stack
+### Middleware reference
 
 | Alias | Class | Applied to |
 |---|---|---|
-| *(global web)* | `InitializeTenancyBySubdomain` | Every request |
-| `require.tenant` | `RequireTenantContext` | All tenant domain routes |
-| `tenant.active` | `EnsureTenantActive` | All tenant domain routes |
+| *(global web)* | `InitializeTenancyBySubdomain` | Every HTTP request |
+| `require.tenant` | `RequireTenantContext` | All tenant subdomain routes |
+| `tenant.active` | `EnsureTenantActive` | All tenant subdomain routes |
 | `tenant.user` | `PreventCrossTenantAccess` | Authenticated tenant routes |
-| `only.central` | `OnlyCentralDomain` | Central/super-admin routes |
+| `only.central` | `OnlyCentralDomain` | Central domain / super admin routes |
 
-### Key classes
+### Key support classes
 
 | Class | Purpose |
 |---|---|
-| `App\Support\TenantContext` | Static singleton holding current tenant for request/job lifecycle |
+| `App\Support\TenantContext` | Static singleton holding current tenant for the full request lifecycle |
 | `App\Support\TenantUrl` | Generates `https://{subdomain}.veltrixo.com/path` URLs |
-| `App\Jobs\Middleware\WithTenantContext` | Restores tenant context inside queued jobs |
+| `App\Jobs\Middleware\WithTenantContext` | Restores tenant context inside queued jobs by `$tenantId` |
 
-### Local development
+### URL generation
 
-1. Add wildcard hosts to `/etc/hosts`:
+```php
+// In PHP (service / notification / job)
+TenantUrl::to('/admin/dashboard', $tenant);
+// → https://alnoor.veltrixo.com/admin/dashboard
+
+$tenant->url('/invoices');
+// → https://alnoor.veltrixo.com/invoices
+
+// In Vue (via Inertia shared prop from HandleInertiaRequests)
+// $page.props.currentTenant.subdomain → "alnoor"
+```
+
+### Queue job isolation
+
+Jobs that carry a `$tenantId` constructor parameter use `WithTenantContext` job middleware:
+
+```php
+public function middleware(): array
+{
+    return [new WithTenantContext($this->tenantId)];
+}
+```
+
+Jobs operating on a `Delivery` model (no tenantId) resolve tenant context inline from `$delivery->tenant_id` at the start of `handle()`.
+
+### Local development setup
+
+1. Add wildcard entries to `/etc/hosts`:
    ```
    127.0.0.1  veltrixo.test
    127.0.0.1  alnoor.veltrixo.test
    127.0.0.1  freshmilk.veltrixo.test
    ```
-   Or use `dnsmasq` to wildcard `*.veltrixo.test → 127.0.0.1`.
+   Or configure `dnsmasq` to wildcard all `*.veltrixo.test → 127.0.0.1`.
 
 2. Set in `.env`:
    ```env
@@ -231,77 +307,14 @@ Super admin panel and public pages live on the root domain, protected by `only.c
    APP_URL=http://veltrixo.test
    ```
 
-3. Nginx already configured for `*.veltrixo.test` in `docker/nginx/delivery-saas.conf`.
-
-### Tenant URL generation
-
-```php
-// In PHP
-TenantUrl::to('/admin/dashboard', $tenant);   // https://alnoor.veltrixo.com/admin/dashboard
-$tenant->url('/invoices');                     // https://alnoor.veltrixo.com/invoices
-
-// In Vue (via Inertia shared prop)
-// $page.props.currentTenant.subdomain
-```
-
-### Queue job isolation
-
-Jobs that carry a `$tenantId` use `WithTenantContext` job middleware:
-```php
-public function middleware(): array {
-    return [new WithTenantContext($this->tenantId)];
-}
-```
-
-Jobs that operate on a `Delivery` model resolve the tenant from `$delivery->tenant_id` inside `handle()`.
-
----
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    VELTRIXO PLATFORM                     │
-│                                                         │
-│  ┌───────────┐  ┌────────────┐  ┌───────────────────┐  │
-│  │  Browser  │  │  Mobile    │  │  External API     │  │
-│  │  (SSR +   │  │  PWA       │  │  (REST / Webhook) │  │
-│  │   SPA)    │  │            │  │                   │  │
-│  └─────┬─────┘  └─────┬──────┘  └─────────┬─────────┘  │
-│        └──────────────┴──────────────┬─────┘            │
-│                                      ▼                  │
-│                    ┌─────────────────────────┐          │
-│                    │     Nginx (Port 80/443)  │          │
-│                    └────────────┬────────────┘          │
-│                                 ▼                       │
-│                    ┌─────────────────────────┐          │
-│                    │  Laravel 13 (PHP-FPM)   │          │
-│                    │  + Inertia.js SSR        │          │
-│                    └──────┬──────────┬────────┘          │
-│                           │          │                  │
-│              ┌────────────┘          └───────────┐      │
-│              ▼                                   ▼      │
-│  ┌───────────────────┐          ┌────────────────────┐  │
-│  │   MySQL 8 (DB)    │          │  Laravel Reverb    │  │
-│  │   (per-tenant     │          │  (WebSocket Server)│  │
-│  │   row isolation)  │          │  Port 8080         │  │
-│  └───────────────────┘          └────────────────────┘  │
-│              ▼                                          │
-│  ┌───────────────────┐          ┌────────────────────┐  │
-│  │   Redis           │          │  S3-compatible     │  │
-│  │   (Cache+Queue)   │          │  Object Storage    │  │
-│  └───────────────────┘          └────────────────────┘  │
-│              ▼                                          │
-│  ┌───────────────────┐                                  │
-│  │  Laravel Horizon  │                                  │
-│  │  (Queue Workers)  │                                  │
-│  └───────────────────┘                                  │
-└─────────────────────────────────────────────────────────┘
-```
+3. Nginx is already configured in `docker/nginx/delivery-saas.conf` for `*.veltrixo.test` and `*.veltrixo.com`.
 
 ---
 
 ## Tech Stack
 
 ### Backend
+
 | Layer | Technology |
 |---|---|
 | Language | PHP 8.4 |
@@ -317,9 +330,10 @@ Jobs that operate on a `Delivery` model resolve the tenant from `$delivery->tena
 | Activity Log | Spatie ActivityLog |
 | QR Codes | SimpleSoftwareIO/simple-qrcode |
 | Settings | Spatie Laravel-Settings |
-| Multi-tenancy | Row-level isolation (tenant_id) |
+| Multi-tenancy | Custom subdomain routing + row-level isolation |
 
 ### Frontend
+
 | Layer | Technology |
 |---|---|
 | Framework | Vue 3 (Composition API) |
@@ -327,13 +341,15 @@ Jobs that operate on a `Delivery` model resolve the tenant from `$delivery->tena
 | Type Safety | TypeScript 5.x |
 | Styling | Tailwind CSS 3.x |
 | Icons | Heroicons v2 |
+| Maps | Leaflet.js (business signup geo-pin) |
 | Build | Vite 6 |
 | SSR | Node.js (ssr.ts) |
 
 ### Infrastructure
+
 | Layer | Technology |
 |---|---|
-| Web Server | Nginx |
+| Web Server | Nginx (wildcard subdomain config) |
 | PHP Runtime | PHP-FPM 8.4 |
 | Database | MySQL 8.0 |
 | Cache/Queue | Redis 7 |
@@ -345,95 +361,113 @@ Jobs that operate on a `Delivery` model resolve the tenant from `$delivery->tena
 
 ## Business Workflows
 
+### Business Signup & Verification
+
+New businesses self-register through the public portal at `veltrixo.com/business/register`.
+
+**Step 1 — Business details:**
+1. Business owner visits `veltrixo.com/business/register`
+2. Fills in business name and subdomain (auto-suggested from name, e.g. `alnoor`)
+3. Sees live preview: `alnoor.veltrixo.com`
+4. Pins their delivery area on a Leaflet map (GPS coordinates captured)
+5. Sets delivery radius in km
+
+**Step 2 — Owner account:**
+1. Enters full name, email, phone
+2. Creates a password
+3. Accepts terms
+
+**Step 3 — Plan selection:**
+1. Reviews available SaaS plans (Starter, Business, Enterprise)
+2. Selects preferred plan
+3. Optionally uploads business logo
+4. Submits registration
+
+**What happens immediately after submission:**
+- Tenant record created with `verification_status = pending_verification`, `status = inactive`
+- Admin user created with `account_status = pending`
+- Owner receives `BusinessSignupReceived` email notification
+- All super admins receive `SuperAdminNewBusinessAlert` notification
+- Pending verifications badge increments in super admin sidebar
+
+**Super admin verification:**
+1. Super admin opens `veltrixo.com/super-admin/verifications`
+2. Reviews business details: name, subdomain, GPS location on map, owner info
+3. Two actions available:
+   - **Approve** → selects plan → tenant `status = active`, `verification_status = approved`, owner `account_status = active`, trial subscription created, `BusinessApproved` notification sent to owner with link to `{subdomain}.veltrixo.com/admin/dashboard`
+   - **Reject** → enters reason → `verification_status = rejected`, `BusinessRejected` notification sent with reason
+
+**Subdomain uniqueness:**
+- Validated at registration time (`unique:tenants,subdomain`)
+- Reserved subdomains (`www`, `admin`, `api`, `mail`, `ftp`, `static`, `cdn`) are blocked
+- Must match regex `^[a-z0-9][a-z0-9-]*[a-z0-9]$`, max 63 characters
+
+---
+
 ### Super Admin Flow
 
-The Super Admin is the platform owner — they manage the entire SaaS infrastructure, onboard new businesses, and monitor platform-wide revenue and health.
+The Super Admin is the platform owner — they manage the SaaS infrastructure, verify new businesses, and monitor platform-wide health.
 
 **Dashboard widgets:**
 - Total active tenants
 - Monthly Recurring Revenue (PKR)
-- New sign-ups this month
+- New sign-ups this month (pending verifications badge)
 - Platform-wide delivery count
 - Failed payments / pending wallet approvals
 - Top-performing tenants by revenue
 
-**Onboarding a new business:**
-1. Super Admin creates a new **Tenant** record (business name, domain, contact)
-2. Assigns a **SaaS plan** (Basic: up to 200 customers, Pro: unlimited)
-3. System provisions the tenant automatically — creates default roles, settings, and seed data
-4. Admin credentials are sent to the business owner
-5. Business owner logs in and begins configuring their products and customers
-
-**SaaS plan management:**
-- Create/edit plans with feature flags and customer limits
-- Monitor which tenants are on which plan
-- Upgrade/downgrade tenant plans
-- Handle tenant billing (external or integrated)
-
 **Platform monitoring:**
 - View all deliveries across all tenants (read-only audit)
 - Platform error logs via Telescope (if enabled)
-- Redis/queue health via Horizon
-- WebSocket connection health via Reverb dashboard
+- Redis/queue health via Horizon dashboard
+- WebSocket connection health via Reverb
 
 **Revenue tracking:**
 - PKR wallet recharge volume per month
 - Subscription revenue estimates per tenant
 - Refund/chargeback tracking
 
+**Tenant lifecycle:**
+- View all tenants: active, suspended, pending, rejected
+- Suspend / reactivate tenants
+- Upgrade/downgrade plan
+- View full tenant detail (owner, plan, delivery count, wallet volume)
+
 ---
 
 ### Admin / Manager Flow
 
-The Admin is the business owner or operations manager for a specific tenant. They manage everything within their business.
+The Admin is the business owner or operations manager for a specific tenant. They access their portal at `{subdomain}.veltrixo.com/admin/dashboard`.
 
 **Logging in:**
-- Admin lands on `/admin/dashboard`
-- Sees today's delivery summary: total, pending, assigned, completed, missed
-- Real-time updates via WebSocket — numbers change as riders complete deliveries
+- Admin navigates to `alnoor.veltrixo.com/login`
+- `InitializeTenancyBySubdomain` resolves the tenant from the subdomain
+- After login, `tenant.user` middleware verifies their `tenant_id` matches
+- Lands on `/admin/dashboard` with today's delivery summary
 
 **Managing products:**
-1. Navigate to **Products** → create products (e.g. "Full Cream Milk 1L", "Yoghurt 500g")
-2. Set price (e.g. Rs 180), unit (litre/kg/piece), category, active status
-3. Product variants for different sizes/weights
-4. Products appear in the subscription creation flow for customers
+1. Navigate to Products → create products (e.g. "Full Cream Milk 1L", Rs 180)
+2. Set price, unit, category, active status
+3. Products appear in the subscription creation flow for customers
 
 **Managing customers:**
 1. Add customers manually or let them self-register
-2. View each customer's active subscriptions, wallet balance, delivery history
+2. View subscriptions, wallet balance, delivery history per customer
 3. Adjust wallet balance directly (credit/debit with reason)
-4. Handle pause/cancel requests
-5. View loyalty points balance
-
-**Subscription management:**
-1. View all active subscriptions with status filters
-2. Drill into any subscription — see items, delivery history, next scheduled date
-3. Pause on behalf of customer, resume, or cancel
-4. Bulk operations — pause all subscriptions for a date range (e.g. Eid holidays)
 
 **Delivery workflow (daily operations):**
 1. System auto-generates deliveries each morning via scheduled job
-2. Admin reviews the day's delivery list at `/admin/deliveries`
-3. Filters by status (pending), area, or rider
-4. Selects multiple deliveries → bulk assigns to a rider
-5. Rider receives notification instantly (WebSocket push)
-6. Monitors delivery progress in real-time — status updates as rider works
-7. At end of day, reviews missed deliveries and takes action (reschedule/refund)
+2. Admin reviews delivery list, filters by status / area / rider
+3. Selects multiple deliveries → bulk assigns to a rider
+4. Rider receives instant WebSocket push notification
+5. Monitors real-time delivery progress
+6. Reviews missed deliveries at end of day
 
 **Wallet management:**
-1. Customer submits a recharge request (Rs 500 via JazzCash)
-2. Admin sees pending requests at `/admin/wallets`
-3. Verifies payment proof/reference number
-4. Approves → system credits customer wallet instantly
-5. Or rejects with reason → customer notified
-6. Admin can manually credit wallet for complaints/refunds
-
-**Rider management:**
-1. Create rider accounts — name, phone, vehicle type
-2. Assign riders to delivery routes
-3. Monitor which riders are online/offline in real-time
-4. View rider's delivery completion rate, average time
-5. Handle rider complaints
+1. Customer submits recharge request
+2. Admin verifies payment proof/reference number
+3. Approves → customer wallet credited instantly
+4. Rejects with reason → customer notified
 
 **Analytics:**
 - Daily/weekly/monthly delivery volumes
@@ -441,136 +475,97 @@ The Admin is the business owner or operations manager for a specific tenant. The
 - Customer churn (cancelled subscriptions)
 - Rider performance metrics
 - Product popularity by subscription volume
-- Peak delivery days
 
 ---
 
 ### Rider Flow
 
-The Rider is the delivery person. Their entire experience is designed around a **mobile-first Progressive Web App** — no app store installation needed.
+The Rider is the delivery person. Their portal is a **mobile-first Progressive Web App** at `{subdomain}.veltrixo.com/rider/dashboard`.
 
 **Starting the day:**
-1. Rider opens Veltrixo on their phone browser (PWA installed on home screen)
+1. Opens Veltrixo on phone browser (PWA on home screen)
 2. Logs in → lands on `/rider/dashboard`
-3. Sees today's assigned deliveries (count, map overview if enabled)
-4. Toggles the **Online** switch in the top bar — this broadcasts real-time availability to admin
-5. Today's KPIs show: assigned, completed, remaining, earnings estimate
+3. Sees today's assigned deliveries
+4. Toggles the **Online** switch — broadcasts real-time availability to admin
 
 **Delivery workflow (per delivery):**
-1. Opens the Deliveries list at `/rider/deliveries`
-2. Sees deliveries sorted by route order (optimised by geography)
-3. Taps a delivery card → sees:
-   - Customer name and address
-   - Items to deliver (e.g. "2× Full Cream Milk 1L")
-   - Customer phone number (tap to call)
-   - Map pin for navigation
-4. Taps **Start Delivery** → status changes to `in_progress`, GPS captured, timestamp recorded
-5. Arrives at customer's door → delivers items
-6. Taps **Complete Delivery** → one of:
-   - Customer signs on screen (digital signature)
-   - Customer provides OTP (sent to their phone)
-   - Rider scans QR code on customer's subscription card
-7. Optional: upload a photo of delivered items at the door
-8. System records GPS coordinates, timestamp, delivery proof
-9. Wallet deduction triggers automatically for the customer
-10. Invoice generated in background job
+1. Opens Deliveries list → sorted by route order
+2. Taps delivery card → sees customer name, address, items, phone
+3. Taps **Start Delivery** → status = `in_progress`, GPS + timestamp recorded
+4. Arrives → delivers items
+5. Taps **Complete** → one of:
+   - Customer signature on screen
+   - Customer provides OTP
+   - Rider scans QR code on subscription card
+6. Optional: upload delivery photo
+7. System records GPS, timestamp, proof
+8. Wallet deduction triggers automatically — invoice + receipt dispatched to queue
 
 **Handling issues:**
-- Mark as **Missed** with reason (not home, address wrong, customer rejected)
-- Add notes for admin
-- Missed deliveries appear in admin dashboard for action
-
-**Earnings:**
-- Rider sees daily/weekly earnings breakdown
-- Per-delivery commission calculated automatically
-- Weekly summary available
+- Mark as Missed with reason (not home, wrong address, customer rejected)
+- Admin dashboard updates in real-time via DeliveryStatusUpdated event
 
 **Offline capability:**
-- Rider can view assigned deliveries offline (cached via PWA)
-- Status updates are queued locally and sync when back online
-- Critical for areas with poor connectivity
+- Assigned deliveries cached via PWA Service Worker
+- Status updates queued locally, synced when back online
 
 ---
 
 ### Customer Flow
 
-The Customer is the end consumer — they interact with the platform to manage their recurring deliveries.
+The Customer interacts with the platform at `{subdomain}.veltrixo.com/customer/dashboard`.
 
 **Onboarding:**
 1. Customer registers (or is added by admin)
 2. Receives welcome notification
-3. Prompted to set up their **delivery address**
-4. Prompted to **top up wallet** (minimum Rs 500 recommended)
+3. Sets up delivery address
+4. Tops up wallet (minimum Rs 500 recommended)
 5. Creates first subscription
 
 **Creating a subscription:**
-1. Goes to `/customer/subscriptions` → "New Subscription"
-2. Selects delivery frequency: daily / weekly / bi-weekly / monthly
-3. Selects products and quantities (e.g. 2 litres milk + 500g yoghurt)
-4. Confirms delivery address
-5. Sees pricing summary (e.g. Rs 460/delivery)
-6. Confirms → subscription is active immediately
-7. First delivery is scheduled for the next valid delivery date
-
-**Day-to-day usage:**
-- Customer receives push/SMS notification morning of delivery: "Your delivery is on its way"
-- Real-time status update: "Rider is 3 stops away" (if live tracking enabled)
-- Delivery completed → notification: "Delivered! Rs 460 deducted from wallet"
-- Wallet balance shown in header at all times
+1. Selects frequency: daily / weekly / bi-weekly / monthly
+2. Selects products and quantities
+3. Confirms delivery address
+4. Reviews pricing summary (e.g. Rs 460/delivery)
+5. Subscription active immediately
 
 **Self-service operations:**
-- **Pause subscription** — going on vacation? Pause from date A to date B
-- **Skip a delivery** — skip just next Wednesday without pausing the whole subscription
-- **Swap a product** — change "1L milk" to "2L milk" for next month
-- **Change address** — update delivery address for upcoming deliveries
-- **Add another subscription** — e.g. add a Saturday grocery box
-- **Cancel subscription** — with reason, effective immediately or end-of-period
+- **Pause subscription** — pause from date A to date B
+- **Skip a delivery** — skip just next Wednesday
+- **Swap a product** — change items for next period
+- **Change address** — for upcoming deliveries
+- **Cancel subscription** — with reason
 
 **Wallet management:**
-1. Customer goes to `/customer/wallet`
-2. Sees current balance (e.g. Rs 1,240.00)
-3. Taps **Recharge Wallet**
-4. Enters amount (Rs 1,000), selects payment method (JazzCash/EasyPaisa/bank transfer/cash)
-5. Enters transaction reference/UTR number
-6. Submits → admin receives notification to verify
-7. Admin approves → Rs 1,000 credited within minutes
-8. Full transaction history visible with credits and debits
+1. Submits recharge request with payment method + reference
+2. Admin approves → credited within minutes
+3. Auto-deduction on each delivery completion
+4. Full transaction history with credits and debits
 
 **Invoices & history:**
 - Every delivery generates a PDF invoice
-- Customer downloads from Deliveries → Show
-- Monthly summary invoices also available
-
-**Loyalty & referrals:**
-- Earn loyalty points on every delivery
-- Refer a friend → earn Rs 100 wallet credit when they subscribe
-- Points redeemable against wallet balance
+- Monthly summary invoices available
+- All downloadable from `/customer/deliveries`
 
 ---
 
 ### Support Staff Flow
 
-Support staff handle customer complaints and operational issues. They have read access to customer data and limited action capabilities.
+Support staff handle customer complaints with read access and limited action capabilities.
 
 **Common workflows:**
-1. Customer calls: "My delivery didn't arrive today"
-   - Support opens customer account → views today's delivery status
-   - If marked missed: raises refund request or reschedules
-   - If still pending: contacts rider directly or escalates to admin
+1. Customer calls: "My delivery didn't arrive"
+   - Opens customer account → views delivery status
+   - If missed: raises refund or reschedules
+   - If pending: contacts rider or escalates
 
-2. Customer reports incorrect items delivered:
-   - Support logs a complaint against the delivery
-   - Tags for admin review
-   - Initiates partial refund to wallet if needed
+2. Customer reports incorrect items:
+   - Logs complaint against the delivery
+   - Initiates partial refund to wallet
 
 3. Wallet dispute:
-   - Customer says "I recharged Rs 2,000 but balance not updated"
-   - Support views pending recharge requests
+   - Views pending recharge requests
    - Escalates to finance/admin for approval
-
-4. Subscription confusion:
-   - Walks customer through pausing/skipping
-   - Can update delivery address on behalf of customer
 
 ---
 
@@ -578,21 +573,17 @@ Support staff handle customer complaints and operational issues. They have read 
 
 ### Recurring Subscription Engine
 
-The subscription engine is the heart of Veltrixo. Here is how it works:
+1. **Subscription creation**: Customer defines frequency + product mix + address. System calculates first delivery date based on cut-off rules.
 
-1. **Subscription creation**: Customer defines frequency + product mix + address. The system calculates the first delivery date based on cut-off rules (e.g. "orders before 9 PM are delivered next morning").
+2. **Delivery generation**: `GenerateDeliveriesJob` runs daily. Reads all active subscriptions and creates `Delivery` records. Each delivery is pre-populated with items from `SubscriptionItems`.
 
-2. **Delivery generation**: A scheduled job (`GenerateDeliveriesJob`) runs daily (or weekly for weekly subscriptions). It reads all active subscriptions and creates `Delivery` records for the upcoming period. Each delivery is linked to its subscription and pre-populated with items from `SubscriptionItems`.
+3. **Skip handling**: If a customer has requested a skip for a date, the job checks `SubscriptionSkips` and skips that date.
 
-3. **Skip handling**: If a customer has requested a skip for a date, the job checks `SubscriptionSkips` and skips that date. The delivery is not created.
+4. **Pause handling**: If subscription `status = paused`, no deliveries are generated until resumed. `pause_until` triggers auto-resume.
 
-4. **Pause handling**: If subscription status is `paused`, no deliveries are generated until the subscription is `resumed`. If a `pause_until` date is set, the system auto-resumes on that date.
-
-5. **Missed deliveries**: Another scheduled job runs each evening to check deliveries that are still `pending` or `assigned` past the expected delivery window. These are marked `missed` and alerts sent to admin.
+5. **Missed deliveries**: Evening scheduled job flags deliveries still `pending`/`assigned` past the delivery window. Admin alerted.
 
 ### Wallet Deduction Workflow
-
-Every delivery completion triggers a precise wallet deduction flow:
 
 ```
 Delivery marked "delivered"
@@ -610,46 +601,33 @@ Delivery marked "delivered"
 
 ### Rider Assignment Logic
 
-The bulk assignment feature uses a simple algorithm:
-
-1. Admin selects N deliveries from the filtered list
-2. Selects a rider from the modal
-3. System calls `BulkAssignDeliveries` action:
-   - Validates rider exists and is active
-   - Updates all selected deliveries: `rider_id = $rider->id`, `status = assigned`
-   - Fires `DeliveriesAssigned` event per rider
+1. Admin selects N deliveries and a rider
+2. `BulkAssignDeliveries` action:
+   - Validates rider is active
+   - Updates all deliveries: `rider_id`, `status = assigned`
+   - Fires `DeliveriesAssigned` event
    - Rider notified via WebSocket push + database notification
 
-For automated assignment (future): deliveries can be auto-assigned based on geographic proximity to rider's last known location using the `rider_locations` table.
-
 ### Notification System
-
-Veltrixo uses a layered notification system:
 
 | Channel | Used For |
 |---|---|
 | Database | In-app notification bell |
 | Broadcast (Reverb) | Real-time bell count update |
-| Mail | Invoices, welcome emails |
+| Mail | Invoices, welcome emails, business approval/rejection |
 | SMS (future) | Delivery OTP, low balance alerts |
 
-All notifications extend Laravel's `Notification` class and route through `app/Notifications/`. Custom notification records are stored in `notifications_extended` table for richer data.
-
 ### Queue System
-
-All time-consuming operations are queued to keep the web request fast:
 
 | Job | Queue | Purpose |
 |---|---|---|
 | `GenerateDeliveriesJob` | `deliveries` | Daily delivery creation |
 | `GenerateInvoiceJob` | `invoices` | PDF invoice per delivery |
-| `SendDeliveryReceiptNotification` | `notifications` | Post-delivery notification |
-| `ApproveWalletRechargeJob` | `wallets` | Process approved recharge |
+| `SendDeliveryReceiptJob` | `notifications` | Post-delivery notification |
+| `ProcessWalletDeductionJob` | `wallets` | Process approved recharge |
 | `GenerateAnalyticsReportJob` | `reports` | Nightly analytics aggregation |
 
 ### Real-Time WebSocket Events
-
-Laravel Reverb powers all live updates. Key events:
 
 | Event | Channel | Triggered When |
 |---|---|---|
@@ -661,14 +639,7 @@ Laravel Reverb powers all live updates. Key events:
 
 ### Tenant Isolation
 
-Veltrixo uses **row-level multi-tenancy**. Every table that contains business data has a `tenant_id` foreign key column. The `TenantScope` global scope is applied to all relevant models via `HasTenant` trait:
-
-```php
-// Automatically applied to every query:
-SELECT * FROM deliveries WHERE tenant_id = 42 AND ...
-```
-
-The tenant is resolved from the authenticated user's `tenant_id` on every request. Super admins bypass this scope when needed.
+Veltrixo uses **row-level multi-tenancy**. Every table with business data has a `tenant_id` FK column. The `HasTenant` trait registers a `GlobalScope` that appends `WHERE tenant_id = ?` to all queries automatically. Super admins bypass this scope when needed via `withoutGlobalScope(TenantScope::class)`.
 
 ---
 
@@ -678,8 +649,8 @@ The tenant is resolved from the authenticated user's `tenant_id` on every reques
 
 | Table | Purpose |
 |---|---|
-| `users` | All users (admin/rider/customer), with `tenant_id` |
-| `tenants` | SaaS tenants (businesses) |
+| `users` | All users (admin/rider/customer), with `tenant_id` and `account_status` |
+| `tenants` | SaaS tenants — includes `subdomain`, `latitude`, `longitude`, `delivery_radius_km`, `verification_status`, `verified_at`, `verified_by`, `rejection_reason` |
 | `tenant_plans` | SaaS billing plans |
 | `tenant_subscriptions` | Tenant's current SaaS plan |
 | `products` | Deliverable products per tenant |
@@ -720,36 +691,63 @@ Veltrixo/
 │   ├── Http/
 │   │   ├── Controllers/
 │   │   │   ├── Admin/        # Admin panel controllers
+│   │   │   ├── Business/     # Public signup + super admin verification
 │   │   │   ├── Customer/     # Customer portal controllers
 │   │   │   ├── Rider/        # Rider app controllers
 │   │   │   └── Api/          # REST API controllers
-│   │   ├── Middleware/       # Auth, tenant resolution, role gates
+│   │   ├── Middleware/
+│   │   │   ├── InitializeTenancyBySubdomain.php  # Global: resolves tenant from Host
+│   │   │   ├── EnsureTenantActive.php            # tenant.active alias
+│   │   │   ├── PreventCrossTenantAccess.php       # tenant.user alias
+│   │   │   ├── OnlyCentralDomain.php              # only.central alias
+│   │   │   ├── RequireTenantContext.php           # require.tenant alias
+│   │   │   └── HandleInertiaRequests.php          # Shares auth, tenant, ziggy
 │   │   ├── Requests/         # Form validation (per-action)
+│   │   │   └── Business/
+│   │   │       └── BusinessRegistrationRequest.php
 │   │   └── Resources/        # API resource transformers
 │   ├── Jobs/
 │   │   ├── Delivery/         # GenerateDeliveries, MarkMissed
 │   │   ├── Invoice/          # GenerateInvoice, EmailInvoice
-│   │   ├── Notification/     # SendPush, SendSMS
+│   │   ├── Middleware/
+│   │   │   └── WithTenantContext.php   # Job middleware: restores tenant
+│   │   ├── Notification/     # SendPush, SendDeliveryReceipt
 │   │   ├── Report/           # GenerateAnalytics
 │   │   └── Wallet/           # ProcessRecharge, ProcessRefund
 │   ├── Listeners/            # Event listeners
 │   ├── Models/               # Eloquent models (with HasTenant trait)
-│   ├── Notifications/        # Laravel notification classes
+│   ├── Notifications/
+│   │   └── Business/
+│   │       ├── BusinessApproved.php      # Uses TenantUrl for dashboard link
+│   │       ├── BusinessRejected.php
+│   │       ├── BusinessSignupReceived.php
+│   │       └── SuperAdminNewBusinessAlert.php
 │   ├── Observers/            # Model observers (DeliveryObserver, etc.)
 │   ├── Policies/             # Authorization policies
-│   ├── Repositories/         # Repository classes (abstracted DB access)
+│   ├── Repositories/         # Repository classes
 │   ├── Services/
-│   │   ├── Analytics/        # KPI calculations
-│   │   ├── Delivery/         # Delivery generation & lifecycle
-│   │   ├── Notification/     # Notification dispatch logic
-│   │   ├── Payment/          # Wallet + recharge processing
-│   │   ├── Product/          # Product availability logic
-│   │   ├── Report/           # Report generation
-│   │   ├── Subscription/     # Subscription engine
-│   │   ├── Tenant/           # Tenant provisioning
-│   │   └── Wallet/           # Wallet deduction + credit
+│   │   ├── Analytics/
+│   │   ├── Delivery/
+│   │   ├── Notification/
+│   │   ├── Payment/
+│   │   ├── Product/
+│   │   ├── Report/
+│   │   ├── Subscription/
+│   │   ├── Tenant/
+│   │   │   ├── BusinessSignupService.php  # register(), approve(), reject()
+│   │   │   └── TenantProvisioningService.php
+│   │   └── Wallet/
 │   ├── Settings/             # Spatie settings classes
+│   ├── Support/
+│   │   ├── TenantContext.php  # Static singleton: current tenant per request
+│   │   └── TenantUrl.php      # Generates https://{subdomain}.veltrixo.com/path
 │   └── Traits/               # HasTenant, HasWallet, etc.
+│
+├── bootstrap/
+│   └── app.php               # Registers middleware + aliases
+│
+├── config/
+│   └── tenancy.php           # APP_DOMAIN, CENTRAL_DOMAIN, exempt_subdomains
 │
 ├── database/
 │   ├── migrations/           # 36+ migrations (full schema)
@@ -758,35 +756,42 @@ Veltrixo/
 │
 ├── resources/js/
 │   ├── Components/           # Reusable UI components
-│   │   ├── AppButton.vue     # Button (5 variants, 4 sizes, loading)
-│   │   ├── AppBadge.vue      # Status badge (6 colors)
-│   │   ├── AppCard.vue       # Card wrapper
-│   │   ├── AppModal.vue      # Accessible modal (4 sizes)
-│   │   ├── AppInput.vue      # Form input with validation
-│   │   ├── AppToast.vue      # Flash message toast
-│   │   ├── DataTable.vue     # Generic sortable + selectable table
-│   │   └── TablePagination.vue # Inertia-based pagination
+│   │   ├── AppButton.vue
+│   │   ├── AppBadge.vue
+│   │   ├── AppCard.vue
+│   │   ├── AppModal.vue
+│   │   ├── AppInput.vue
+│   │   ├── AppToast.vue
+│   │   ├── DataTable.vue
+│   │   └── TablePagination.vue
 │   ├── Layouts/
 │   │   ├── AdminLayout.vue   # Dark sidebar CMS layout
-│   │   ├── CustomerLayout.vue # Customer portal layout
+│   │   ├── CustomerLayout.vue
 │   │   └── RiderLayout.vue   # Mobile-first rider layout
 │   ├── Pages/
-│   │   ├── Admin/            # Admin panel pages (Deliveries, Products, etc.)
-│   │   ├── Customer/         # Customer portal pages
-│   │   └── Rider/            # Rider app pages
+│   │   ├── Admin/            # Admin panel pages
+│   │   ├── Business/
+│   │   │   ├── Register.vue  # 3-step signup wizard (Leaflet map, subdomain)
+│   │   │   └── Pending.vue   # Waiting for approval
+│   │   ├── Customer/
+│   │   ├── Errors/
+│   │   │   ├── TenantNotFound.vue    # 404: unknown subdomain
+│   │   │   └── TenantSuspended.vue   # 403: suspended account
+│   │   └── Rider/
 │   └── stores/               # Pinia stores (if used)
 │
 ├── routes/
-│   ├── web.php               # Role-grouped web routes
+│   ├── web.php               # Domain-grouped routes (central + tenant subdomain)
+│   ├── auth.php              # Domain-agnostic auth routes
 │   ├── api.php               # REST API routes
 │   └── channels.php          # Broadcast channel auth
 │
 ├── docker/
-│   ├── nginx/                # Nginx site config (WebSocket proxying)
-│   └── supervisor/           # Supervisor config (PHP-FPM + queue workers)
+│   ├── nginx/
+│   │   └── delivery-saas.conf  # Nginx: wildcard *.veltrixo.com, Host header pass
+│   └── supervisor/             # Supervisor: PHP-FPM + Horizon + Reverb
 │
-├── Dockerfile                # Production Docker image (PHP 8.4-FPM Alpine)
-└── docker-compose.yml        # Dev compose (via Laradock)
+└── Dockerfile                  # Production Docker image (PHP 8.4-FPM Alpine)
 ```
 
 ---
@@ -799,16 +804,31 @@ Veltrixo uses named queues for priority control, monitored by Laravel Horizon.
 ┌─────────────────────────────────────────────────┐
 │               Laravel Horizon                   │
 │                                                 │
-│  Queue: default    → General operations         │
-│  Queue: deliveries → Time-critical scheduling   │
-│  Queue: invoices   → PDF generation             │
-│  Queue: wallets    → Payment processing         │
+│  Queue: default       → General operations      │
+│  Queue: deliveries    → Time-critical scheduling │
+│  Queue: invoices      → PDF generation          │
+│  Queue: wallets       → Payment processing      │
 │  Queue: notifications → Push/email dispatch     │
-│  Queue: reports    → Analytics (low priority)   │
+│  Queue: reports       → Analytics (low priority)│
 └─────────────────────────────────────────────────┘
 ```
 
-**Scheduled jobs (Kernel):**
+**Tenant context in queued jobs:**
+
+Jobs know which tenant they belong to via the `WithTenantContext` job middleware. This restores the `TenantContext` singleton before `handle()` runs, so any service called inside the job that reads `TenantContext::get()` will see the correct tenant.
+
+```php
+// Jobs with tenantId in constructor (GenerateDeliveriesJob, GenerateAnalyticsReportJob)
+public function middleware(): array
+{
+    return [new WithTenantContext($this->tenantId)];
+}
+
+// Jobs that load a Delivery (GenerateInvoiceJob, ProcessWalletDeductionJob, SendDeliveryReceiptJob)
+// Resolve tenant from $delivery->tenant_id inside handle()
+```
+
+**Scheduled jobs:**
 
 | Schedule | Job | Effect |
 |---|---|---|
@@ -824,14 +844,14 @@ Veltrixo uses named queues for priority control, monitored by Laravel Horizon.
 Laravel Reverb (self-hosted WebSocket server) handles all live updates.
 
 ```
-Client (Vue 3)
-    ↕ Echo.js / WebSocket
+Client (Vue 3 + Echo.js)
+    ↕ WebSocket ws://{subdomain}.veltrixo.com/app/
 Laravel Reverb (Port 8080)
     ↕ Redis Pub/Sub
-Laravel (Broadcasting)
+Laravel Broadcasting
 ```
 
-**Channel types used:**
+**Channel types:**
 
 | Channel | Type | Auth |
 |---|---|---|
@@ -840,30 +860,40 @@ Laravel (Broadcasting)
 | `customer.{id}` | Private | Customer only |
 | `admin-alerts.{tenant_id}` | Private | Admin only |
 
-Channel authorization is handled in `routes/channels.php` using role-based policies.
+Channel auth is in `routes/channels.php` using role-based policies.
 
 ---
 
 ## Multi-Tenancy Model
 
-Veltrixo uses **shared-database, shared-schema multi-tenancy** with row-level isolation.
+Veltrixo uses **shared-database, shared-schema multi-tenancy** with two isolation layers:
 
-**Why this approach?**
-- Simpler infrastructure (one database to manage)
+### 1. Subdomain routing (request layer)
+
+Every tenant gets their own subdomain. `InitializeTenancyBySubdomain` resolves the tenant from the HTTP `Host` header on every request before any route handler runs. This means:
+- Tenant users can only access routes on their own subdomain
+- Super admin routes are locked to the central domain via `only.central` middleware
+- Cross-tenant impersonation is caught by `PreventCrossTenantAccess`
+
+### 2. Row-level isolation (database layer)
+
+Every data model uses the `HasTenant` trait, which registers a `GlobalScope` that automatically appends `WHERE tenant_id = ?` to every query.
+
+```php
+// Automatically applied to every query on a tenant-scoped model:
+SELECT * FROM deliveries WHERE tenant_id = 42 AND ...
+```
+
+**Why shared-database?**
+- Simpler infrastructure (one database)
 - Shared connection pooling (efficient)
 - Easy cross-tenant reporting for Super Admin
 - Suitable for 10–500 tenants
 
-**How it's enforced:**
-1. Every data model uses the `HasTenant` trait
-2. The trait registers a `GlobalScope` that appends `WHERE tenant_id = ?` to every query
-3. Middleware resolves the tenant from the authenticated user on each request
-4. Super Admin can bypass via `withoutGlobalScope(TenantScope::class)`
-
-**Tenant data is fully isolated:**
-- Products: tenant A's products never appear for tenant B
-- Customers: completely separate user pools per tenant
-- Deliveries, wallets, subscriptions: all scoped
+**Super Admin bypass:**
+```php
+Delivery::withoutGlobalScope(TenantScope::class)->where(...)->get();
+```
 
 ---
 
@@ -874,6 +904,7 @@ Veltrixo uses **shared-database, shared-schema multi-tenancy** with row-level is
 - Docker + Docker Compose
 - Laradock (cloned alongside this project)
 - Node.js 20+ (on host, for asset building)
+- Python 3 (on host, for DNS testing if using dnsmasq)
 
 ### Directory Structure
 
@@ -881,13 +912,13 @@ Veltrixo uses **shared-database, shared-schema multi-tenancy** with row-level is
 ~/projects/
 ├── laradock/           ← Laradock Docker setup
 └── laravel/
-    └── delivery-saas/  ← Veltrixo project root
+    └── Veltrixo/       ← This project
 ```
 
 ### Step 1 — Clone the project
 
 ```bash
-git clone https://github.com/mateen212/Veltrixo.git ~/projects/laravel/delivery-saas
+git clone https://github.com/mateen212/Veltrixo.git ~/projects/laravel/Veltrixo
 ```
 
 ### Step 2 — Start Laradock services
@@ -903,7 +934,7 @@ All backend commands must be run inside Docker:
 
 ```bash
 docker compose exec workspace bash
-cd /var/www/delivery-saas
+cd /var/www/Veltrixo
 ```
 
 ### Step 4 — Install PHP dependencies
@@ -929,7 +960,7 @@ php artisan migrate --seed
 
 This creates:
 - Super Admin: `superadmin@veltrixo.test` / `password`
-- Demo Tenant with Admin: `admin@demo.test` / `password`
+- Demo Tenant (subdomain: `demo`) with Admin: `admin@demo.test` / `password`
 - Demo Customer: `customer@demo.test` / `password`
 - Demo Rider: `rider@demo.test` / `password`
 - Sample products (PKR pricing), subscriptions, and deliveries
@@ -937,7 +968,7 @@ This creates:
 ### Step 7 — Build frontend assets (on host)
 
 ```bash
-cd ~/projects/laravel/delivery-saas
+cd ~/projects/laravel/Veltrixo
 npm install
 npm run build
 ```
@@ -945,26 +976,48 @@ npm run build
 ### Step 8 — Set up storage symlink (inside container)
 
 ```bash
-docker compose exec workspace bash
-cd /var/www/delivery-saas
 php artisan storage:link
 ```
 
-### Step 9 — Visit the application
+### Step 9 — Set up local subdomain DNS
+
+Add entries to `/etc/hosts` on your host machine:
 
 ```
-http://localhost
+127.0.0.1  veltrixo.test
+127.0.0.1  demo.veltrixo.test
+127.0.0.1  alnoor.veltrixo.test
+```
+
+For dynamic subdomain support without editing hosts for every tenant, install `dnsmasq`:
+
+```bash
+# macOS
+brew install dnsmasq
+echo "address=/.veltrixo.test/127.0.0.1" >> /usr/local/etc/dnsmasq.conf
+sudo brew services start dnsmasq
+```
+
+### Step 10 — Visit the application
+
+```
+http://veltrixo.test          → Super Admin (central domain)
+http://demo.veltrixo.test     → Demo tenant portal
 ```
 
 ---
 
 ## Environment Setup
 
-Key `.env` variables to configure:
+Key `.env` variables:
 
 ```dotenv
 APP_NAME=Veltrixo
 APP_URL=http://veltrixo.test
+
+# Subdomain tenancy — REQUIRED
+APP_DOMAIN=veltrixo.test
+CENTRAL_DOMAIN=veltrixo.test
 
 # Database (Laradock defaults)
 DB_CONNECTION=mysql
@@ -1006,6 +1059,10 @@ AWS_BUCKET=
 # Currency
 CURRENCY=PKR
 CURRENCY_SYMBOL=Rs
+
+# PWA Push Notifications
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
 ```
 
 ---
@@ -1017,13 +1074,13 @@ CURRENCY_SYMBOL=Rs
 Inside the workspace container:
 
 ```bash
-cd /var/www/delivery-saas
+cd /var/www/Veltrixo
 
 # Start Horizon (monitors all queues)
 php artisan horizon
 ```
 
-Horizon dashboard: `http://veltrixo.test/horizon` (admin only)
+Horizon dashboard: `http://veltrixo.test/horizon` (super admin only)
 
 ### Run scheduled commands manually
 
@@ -1060,13 +1117,13 @@ autorestart=true
 
 ```bash
 # Inside workspace container
-cd /var/www/delivery-saas
+cd /var/www/Veltrixo
 php artisan reverb:start
 ```
 
 ### Production (via Supervisor)
 
-Reverb runs on port 8080 and Nginx proxies `/app/` path to it:
+Reverb runs on port 8080. Nginx proxies `/app/` path to it:
 
 ```nginx
 location /app/ {
@@ -1074,8 +1131,11 @@ location /app/ {
     proxy_http_version 1.1;
     proxy_set_header   Upgrade $http_upgrade;
     proxy_set_header   Connection "Upgrade";
+    proxy_set_header   Host $host;
 }
 ```
+
+This proxying works on every subdomain because the Nginx wildcard config serves all `*.veltrixo.com`.
 
 ### Frontend (Echo)
 
@@ -1143,13 +1203,23 @@ The `Dockerfile` is a multi-stage Alpine build that:
 # Server: Ubuntu 24.04 LTS
 apt install php8.4-fpm php8.4-mysql php8.4-redis nginx mysql-client redis
 
-git clone ... /var/www/Veltrixo
+git clone https://github.com/mateen212/Veltrixo.git /var/www/Veltrixo
 cd /var/www/Veltrixo
 composer install --no-dev --optimize-autoloader
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 npm ci && npm run build
+```
+
+**Nginx wildcard SSL (production):**
+
+For wildcard HTTPS you need a wildcard SSL certificate (e.g. from Let's Encrypt with DNS challenge):
+
+```bash
+certbot certonly --dns-cloudflare \
+  -d veltrixo.com \
+  -d "*.veltrixo.com"
 ```
 
 ### Post-deployment commands
@@ -1167,7 +1237,10 @@ supervisorctl restart all
 
 - **Authentication**: Laravel Breeze (session-based) + Sanctum (API tokens)
 - **RBAC**: Spatie Permission — roles: `super_admin`, `admin`, `rider`, `customer`
-- **Tenant isolation**: Global scope on all models — cross-tenant data leakage impossible
+- **Subdomain isolation**: `InitializeTenancyBySubdomain` + `PreventCrossTenantAccess` prevent any cross-tenant data access at the HTTP layer
+- **Tenant row-level isolation**: `HasTenant` global scope on all data models — cross-tenant DB leakage impossible
+- **Central domain lock**: `OnlyCentralDomain` middleware prevents tenant users from accessing super admin routes
+- **Business verification**: New businesses start `pending_verification` — no active subdomain until explicitly approved by super admin
 - **CSRF protection**: Laravel's built-in CSRF middleware on all web routes
 - **XSS prevention**: Inertia.js escapes all rendered data; CSP headers via Nginx
 - **SQL injection**: Eloquent ORM with parameterised queries throughout
@@ -1175,7 +1248,6 @@ supervisorctl restart all
 - **Security headers**: `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy` set in Nginx config
 - **Input validation**: Dedicated `FormRequest` classes for every write operation
 - **Activity logging**: Spatie ActivityLog records all admin and finance operations with actor, IP, payload
-- **Sensitive data**: Wallet amounts and payment references stored encrypted where applicable
 
 ---
 
@@ -1183,7 +1255,7 @@ supervisorctl restart all
 
 ```bash
 # Run all tests (inside workspace container)
-cd /var/www/delivery-saas
+cd /var/www/Veltrixo
 php artisan test
 
 # Run a specific test suite
@@ -1198,14 +1270,18 @@ php artisan test --coverage
 
 | Suite | Covers |
 |---|---|
-| Unit | Services, DTOs, calculation logic |
-| Feature | HTTP endpoints, Inertia responses, auth |
-| Integration | Queue jobs, event listeners, observers |
+| Unit | Services, DTOs, TenantContext, TenantUrl, calculation logic |
+| Feature | HTTP endpoints, Inertia responses, auth, subdomain routing |
+| Integration | Queue jobs (WithTenantContext), event listeners, observers |
 
 Key test cases:
+- Subdomain resolution (correct tenant loaded from Host header)
+- Cross-tenant access prevention (tenant.user middleware)
+- Central domain lock (only.central middleware)
+- Business signup → pending_verification state
+- Super admin approval → tenant active + subdomain live
 - Subscription creation → delivery generation
 - Wallet deduction on delivery completion
-- Tenant isolation (cannot read other tenant's data)
 - Rider assignment bulk action
 - Skip logic (delivery not created for skipped dates)
 - Missed delivery detection
@@ -1214,12 +1290,11 @@ Key test cases:
 
 ## API Architecture
 
-The REST API (`/api/v1/...`) is designed for:
-- Mobile apps (future native app)
-- Third-party integrations
-- Partner webhooks
+The REST API (`/api/v1/...`) is designed for mobile apps and third-party integrations.
 
 Authentication: Laravel Sanctum (Bearer token)
+
+The API is tenant-aware — the token carries the user's `tenant_id`, so all API responses are automatically scoped.
 
 Example endpoints:
 
@@ -1239,7 +1314,7 @@ All responses use Laravel API Resources for consistent JSON structure.
 
 ## Performance Optimizations
 
-- **Database indexes** on all FK columns, `tenant_id`, `status`, `delivery_date` (migration: `add_performance_indexes`)
+- **Database indexes** on all FK columns, `tenant_id`, `status`, `delivery_date`, `subdomain` (unique index)
 - **Query optimisation**: Eager loading via `with()` throughout — no N+1 queries
 - **Pagination**: All list endpoints paginated — no full table scans
 - **Caching**: Dashboard KPIs cached in Redis (TTL 5 minutes), invalidated on relevant events
@@ -1248,6 +1323,7 @@ All responses use Laravel API Resources for consistent JSON structure.
 - **Opcache**: PHP OPcache enabled in production Dockerfile
 - **Lazy loading routes**: Vite code-splits per page automatically
 - **Queue workers**: All heavy operations (PDF, email, analytics) are async
+- **Tenant lookup**: `tenants.subdomain` has a unique index — O(1) lookup per request
 
 ---
 
@@ -1289,6 +1365,7 @@ Microservice candidates (when needed):
 - [ ] Multi-currency support
 - [ ] Inventory management module
 - [ ] Automated refund processing
+- [ ] Wildcard SSL auto-provisioning per tenant
 
 ---
 
