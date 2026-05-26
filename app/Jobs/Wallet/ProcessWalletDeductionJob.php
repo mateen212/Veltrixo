@@ -3,7 +3,9 @@
 namespace App\Jobs\Wallet;
 
 use App\Models\Delivery;
+use App\Models\Tenant;
 use App\Services\Wallet\WalletService;
+use App\Support\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -43,11 +45,17 @@ class ProcessWalletDeductionJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(WalletService $walletService): void
     {
+        // Resolve tenant context from the delivery's tenant_id for proper isolation
         $delivery = Delivery::with('user')->find($this->deliveryId);
 
         if (!$delivery) {
             Log::warning("[WalletDeduction] delivery not found id={$this->deliveryId}");
             return;
+        }
+
+        // Set tenant context for downstream wallet services
+        if ($delivery->tenant_id && ($tenant = Tenant::find($delivery->tenant_id))) {
+            TenantContext::set($tenant);
         }
 
         if ($delivery->is_paid || $delivery->total_amount <= 0) {

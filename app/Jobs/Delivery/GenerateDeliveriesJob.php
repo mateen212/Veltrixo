@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use App\Jobs\Middleware\WithTenantContext;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
@@ -38,6 +39,7 @@ class GenerateDeliveriesJob implements ShouldQueue, ShouldBeUnique
     public function middleware(): array
     {
         return [
+            new WithTenantContext($this->tenantId),
             (new WithoutOverlapping("tenant:{$this->tenantId}:deliveries:{$this->date}"))
                 ->releaseAfter(30)
                 ->expireAfter(600),

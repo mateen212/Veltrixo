@@ -16,6 +16,7 @@ class BusinessRegistrationRequest extends FormRequest
     {
         return [
             'business_name'      => ['required', 'string', 'max:100'],
+            'subdomain'          => ['required', 'string', 'regex:/^[a-z0-9][a-z0-9-]*[a-z0-9]$/', 'max:63', 'unique:tenants,subdomain'],
             'business_address'   => ['nullable', 'string', 'max:255'],
             'city'               => ['nullable', 'string', 'max:100'],
             'area'               => ['nullable', 'string', 'max:100'],
@@ -35,6 +36,8 @@ class BusinessRegistrationRequest extends FormRequest
     {
         return [
             'owner_email.unique'    => 'An account with this email already exists.',
+            'subdomain.unique'      => 'This subdomain is already taken. Please choose another.',
+            'subdomain.regex'       => 'Subdomain may only contain lowercase letters, numbers, and hyphens.',
             'selected_plan.exists'  => 'The selected plan is not available.',
         ];
     }

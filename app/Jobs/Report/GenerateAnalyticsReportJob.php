@@ -6,6 +6,7 @@ use App\Models\Delivery;
 use App\Models\Subscription;
 use App\Models\WalletTransaction;
 use App\Models\Tenant;
+use App\Jobs\Middleware\WithTenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,6 +26,11 @@ class GenerateAnalyticsReportJob implements ShouldQueue
         public readonly int    $tenantId,
         public readonly string $date
     ) {}
+
+    public function middleware(): array
+    {
+        return [new WithTenantContext($this->tenantId)];
+    }
 
     public function handle(): void
     {

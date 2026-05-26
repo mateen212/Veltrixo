@@ -3,6 +3,8 @@
 namespace App\Jobs\Invoice;
 
 use App\Models\Delivery;
+use App\Models\Tenant;
+use App\Support\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -37,6 +39,11 @@ class GenerateInvoiceJob implements ShouldQueue, ShouldBeUnique
         if (!$delivery) {
             Log::warning("[GenerateInvoice] delivery not found id={$this->deliveryId}");
             return;
+        }
+
+        // Set tenant context for any downstream services
+        if ($delivery->tenant_id && ($tenant = Tenant::find($delivery->tenant_id))) {
+            TenantContext::set($tenant);
         }
 
         // Invoice generation logic handled by InvoiceService (injected when needed)

@@ -3,7 +3,9 @@
 namespace App\Jobs\Notification;
 
 use App\Models\Delivery;
+use App\Models\Tenant;
 use App\Notifications\Customer\DeliveryCompletedNotification;
+use App\Support\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -27,6 +29,11 @@ class SendDeliveryReceiptJob implements ShouldQueue
         if (!$delivery) {
             Log::warning("SendDeliveryReceiptJob: delivery #{$this->deliveryId} not found.");
             return;
+        }
+
+        // Set tenant context for downstream notification channels
+        if ($delivery->tenant_id && ($tenant = Tenant::find($delivery->tenant_id))) {
+            TenantContext::set($tenant);
         }
 
         if (!$delivery->user) {

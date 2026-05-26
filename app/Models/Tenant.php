@@ -81,6 +81,12 @@ class Tenant extends Model
         return $this->status === 'active' && $this->verification_status === 'approved';
     }
 
+    /** Generate a URL on this tenant's subdomain */
+    public function url(string $path = ''): string
+    {
+        return \App\Support\TenantUrl::to($path, $this);
+    }
+
     public function isPendingVerification(): bool
     {
         return $this->verification_status === 'pending_verification';

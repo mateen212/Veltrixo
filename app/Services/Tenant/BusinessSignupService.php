@@ -35,6 +35,7 @@ class BusinessSignupService
             $tenant = Tenant::create([
                 'name'                => $data['business_name'],
                 'slug'                => Str::slug($data['business_name']) . '-' . Str::random(4),
+                'subdomain'           => $data['subdomain'],
                 'owner_id'            => $adminUser->id,
                 'email'               => $data['owner_email'],
                 'phone'               => $data['owner_phone'] ?? null,

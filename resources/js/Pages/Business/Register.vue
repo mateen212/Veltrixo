@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { router, useForm, Head } from '@inertiajs/vue3'
 
 interface Plan {
@@ -20,6 +20,8 @@ const totalSteps = 3
 
 const form = useForm({
     business_name: '',
+    subdomain: '',
+    subdomainManuallyEdited: false,
     business_address: '',
     city: '',
     area: '',
@@ -33,6 +35,21 @@ const form = useForm({
     delivery_radius_km: 5,
     selected_plan: props.plans[0]?.slug ?? 'starter',
     logo: null as File | null,
+})
+
+// Auto-suggest subdomain from business_name unless user has manually edited it
+function toSubdomain(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 63)
+}
+
+watch(() => form.business_name, (name) => {
+    if (!form.subdomainManuallyEdited) {
+        form.subdomain = toSubdomain(name)
+    }
 })
 
 // ── Location / Map ────────────────────────────────────────────────────────────
@@ -133,7 +150,9 @@ onMounted(() => {
 
 // ── Wizard navigation ─────────────────────────────────────────────────────────
 const step1Valid = computed(() =>
-    form.business_name.trim().length > 0 && form.latitude !== null && form.longitude !== null
+    form.business_name.trim().length > 0 &&
+    form.subdomain.trim().length > 0 &&
+    form.latitude !== null && form.longitude !== null
 )
 const step2Valid = computed(() =>
     form.owner_name.trim().length > 0 &&
@@ -205,6 +224,26 @@ function submit() {
                                 class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                             <p v-if="form.errors.business_name" class="text-red-500 text-sm mt-1">{{ form.errors.business_name }}</p>
+                        </div>
+
+                        <!-- Subdomain field with live preview -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Your Business Portal URL <span class="text-red-500">*</span></label>
+                            <div class="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
+                                <input
+                                    v-model="form.subdomain"
+                                    @input="form.subdomainManuallyEdited = true"
+                                    type="text"
+                                    placeholder="your-business"
+                                    class="flex-1 px-4 py-2.5 outline-none text-slate-800 lowercase"
+                                    maxlength="63"
+                                />
+                                <span class="px-3 py-2.5 bg-slate-50 text-slate-500 text-sm border-l border-slate-200 select-none">.veltrixo.com</span>
+                            </div>
+                            <p v-if="form.subdomain" class="text-indigo-600 text-xs mt-1">
+                                Your portal: <span class="font-semibold">{{ form.subdomain }}.veltrixo.com</span>
+                            </p>
+                            <p v-if="form.errors.subdomain" class="text-red-500 text-sm mt-1">{{ form.errors.subdomain }}</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">

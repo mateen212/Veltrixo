@@ -4,6 +4,7 @@ namespace App\Notifications\Business;
 
 use App\Models\Tenant;
 use App\Models\TenantPlan;
+use App\Support\TenantUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -30,7 +31,7 @@ class BusinessApproved extends Notification implements ShouldQueue
             ->greeting('Congratulations, ' . $notifiable->name . '!')
             ->line('Your business **' . $this->tenant->name . '** has been approved.')
             ->line('You are now on the **' . $this->plan->name . '** plan with a 30-day free trial.')
-            ->action('Go to Dashboard', url('/admin/dashboard'))
+            ->action('Go to Dashboard', TenantUrl::to('/admin/dashboard', $this->tenant))
             ->line('Start setting up your products, riders, and delivery schedule!');
     }
 

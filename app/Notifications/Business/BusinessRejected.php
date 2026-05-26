@@ -3,6 +3,7 @@
 namespace App\Notifications\Business;
 
 use App\Models\Tenant;
+use App\Support\TenantUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;

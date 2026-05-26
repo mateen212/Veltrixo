@@ -14,14 +14,20 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            \App\Http\Middleware\InitializeTenancyBySubdomain::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->alias([
-            'role'       => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'role'              => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'        => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission'=> \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            // Tenancy middleware
+            'tenant.active'     => \App\Http\Middleware\EnsureTenantActive::class,
+            'tenant.user'       => \App\Http\Middleware\PreventCrossTenantAccess::class,
+            'require.tenant'    => \App\Http\Middleware\RequireTenantContext::class,
+            'only.central'      => \App\Http\Middleware\OnlyCentralDomain::class,
         ]);
     })
     ->withProviders([

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Tenant;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
@@ -44,6 +45,8 @@ class HandleInertiaRequests extends Middleware
             'pendingVerificationsCount' => fn () => $request->user()?->hasRole('super_admin')
                 ? Tenant::where('verification_status', 'pending_verification')->count()
                 : null,
+            // Current tenant — available to all Vue pages on subdomain requests
+            'currentTenant' => fn () => TenantContext::get(),
         ];
     }
 }

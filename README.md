@@ -151,6 +151,112 @@ Veltrixo does exactly that. One installation can power **multiple completely iso
 
 ## Architecture Overview
 
+---
+
+## Subdomain Multi-Tenancy
+
+Every approved business gets a unique subdomain: `{slug}.veltrixo.com`.
+
+### How it works
+
+```
+Request: freshmilk.veltrixo.com/admin/dashboard
+         │
+         ▼
+   Nginx (wildcard *.veltrixo.com)
+         │
+         ▼
+   InitializeTenancyBySubdomain   ← global web middleware
+   • extracts "freshmilk" from Host header
+   • finds Tenant where subdomain = "freshmilk"
+   • calls TenantContext::set($tenant)
+   • unknown subdomain → 404 Errors/TenantNotFound
+         │
+         ▼
+   require.tenant middleware       ← all tenant domain routes
+   • ensures TenantContext is set
+         │
+         ▼
+   tenant.active middleware
+   • suspended  → 403 Errors/TenantSuspended
+   • pending    → 403 Business/Pending
+   • rejected   → 403 Errors/TenantNotFound
+         │
+         ▼
+   tenant.user middleware          ← authenticated routes only
+   • verifies auth user belongs to this tenant
+   • cross-tenant access → logout + redirect to correct domain
+   • super_admin role is exempt (can inspect all tenants)
+         │
+         ▼
+   Controller
+```
+
+### Central domain (veltrixo.com)
+
+Super admin panel and public pages live on the root domain, protected by `only.central` middleware which aborts 404 if a tenant subdomain is detected.
+
+### Middleware stack
+
+| Alias | Class | Applied to |
+|---|---|---|
+| *(global web)* | `InitializeTenancyBySubdomain` | Every request |
+| `require.tenant` | `RequireTenantContext` | All tenant domain routes |
+| `tenant.active` | `EnsureTenantActive` | All tenant domain routes |
+| `tenant.user` | `PreventCrossTenantAccess` | Authenticated tenant routes |
+| `only.central` | `OnlyCentralDomain` | Central/super-admin routes |
+
+### Key classes
+
+| Class | Purpose |
+|---|---|
+| `App\Support\TenantContext` | Static singleton holding current tenant for request/job lifecycle |
+| `App\Support\TenantUrl` | Generates `https://{subdomain}.veltrixo.com/path` URLs |
+| `App\Jobs\Middleware\WithTenantContext` | Restores tenant context inside queued jobs |
+
+### Local development
+
+1. Add wildcard hosts to `/etc/hosts`:
+   ```
+   127.0.0.1  veltrixo.test
+   127.0.0.1  alnoor.veltrixo.test
+   127.0.0.1  freshmilk.veltrixo.test
+   ```
+   Or use `dnsmasq` to wildcard `*.veltrixo.test → 127.0.0.1`.
+
+2. Set in `.env`:
+   ```env
+   APP_DOMAIN=veltrixo.test
+   CENTRAL_DOMAIN=veltrixo.test
+   APP_URL=http://veltrixo.test
+   ```
+
+3. Nginx already configured for `*.veltrixo.test` in `docker/nginx/delivery-saas.conf`.
+
+### Tenant URL generation
+
+```php
+// In PHP
+TenantUrl::to('/admin/dashboard', $tenant);   // https://alnoor.veltrixo.com/admin/dashboard
+$tenant->url('/invoices');                     // https://alnoor.veltrixo.com/invoices
+
+// In Vue (via Inertia shared prop)
+// $page.props.currentTenant.subdomain
+```
+
+### Queue job isolation
+
+Jobs that carry a `$tenantId` use `WithTenantContext` job middleware:
+```php
+public function middleware(): array {
+    return [new WithTenantContext($this->tenantId)];
+}
+```
+
+Jobs that operate on a `Delivery` model resolve the tenant from `$delivery->tenant_id` inside `handle()`.
+
+---
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    VELTRIXO PLATFORM                     │
