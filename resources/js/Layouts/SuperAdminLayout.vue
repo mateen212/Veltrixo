@@ -5,6 +5,7 @@ import AppToast from '@/Components/AppToast.vue'
 import {
     HomeIcon, BuildingOfficeIcon, ChartBarSquareIcon,
     Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon,
+    ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 
 defineProps<{ title?: string }>()
@@ -19,9 +20,11 @@ const initials = computed(() => {
 })
 
 const navItems = [
-    { label: 'Dashboard', href: 'super-admin.dashboard',      icon: HomeIcon },
-    { label: 'Tenants',   href: 'super-admin.tenants.index',  icon: BuildingOfficeIcon },
-    { label: 'Plans',     href: 'super-admin.plans.index',    icon: ChartBarSquareIcon },
+    { label: 'Dashboard',     href: 'super-admin.dashboard',            icon: HomeIcon },
+    { label: 'Tenants',       href: 'super-admin.tenants.index',        icon: BuildingOfficeIcon },
+    { label: 'Plans',         href: 'super-admin.plans.index',          icon: ChartBarSquareIcon },
+    { label: 'Verifications', href: 'super-admin.verifications.index',  icon: ShieldCheckIcon,
+      badge: computed(() => (page.props as any).pendingVerificationsCount ?? null) },
 ]
 
 function isActive(routeName: string) {
@@ -70,7 +73,11 @@ function isActive(routeName: string) {
                     @click="sidebarOpen = false">
                     <component :is="item.icon" :class="['h-4 w-4 shrink-0', isActive(item.href) ? 'text-violet-400' : 'text-white/40']" />
                     {{ item.label }}
-                    <span v-if="isActive(item.href)" class="ml-auto h-1.5 w-1.5 rounded-full bg-violet-400" />
+                    <span
+                        v-if="item.badge?.value"
+                        class="ml-auto text-[10px] font-bold bg-amber-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
+                    >{{ item.badge.value }}</span>
+                    <span v-else-if="isActive(item.href)" class="ml-auto h-1.5 w-1.5 rounded-full bg-violet-400" />
                 </Link>
             </nav>
 

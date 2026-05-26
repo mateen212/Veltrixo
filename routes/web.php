@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\Business;
 use App\Http\Controllers\Customer;
 use App\Http\Controllers\Rider;
 use App\Http\Controllers\SuperAdmin;
@@ -14,6 +15,11 @@ Route::get('/', function () {
         'canRegister' => Route::has('register'),
     ]);
 })->name('home');
+
+// ─── Public Business Registration ───────────────────────────────────────────
+Route::get('/business/register', [Business\RegistrationController::class, 'show'])->name('business.register');
+Route::post('/business/register', [Business\RegistrationController::class, 'store'])->name('business.register.store');
+Route::get('/business/pending', fn () => Inertia::render('Business/Pending'))->name('business.pending');
 
 // Generic /dashboard → redirects to the correct role dashboard
 Route::get('/dashboard', function () {
@@ -43,6 +49,12 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin
     Route::post('/plans', [SuperAdmin\PlanController::class, 'store'])->name('plans.store');
     Route::patch('/plans/{plan}', [SuperAdmin\PlanController::class, 'update'])->name('plans.update');
     Route::delete('/plans/{plan}', [SuperAdmin\PlanController::class, 'destroy'])->name('plans.destroy');
+
+    // Business verification panel
+    Route::get('/business-verifications', [SuperAdmin\VerificationController::class, 'index'])->name('verifications.index');
+    Route::get('/business-verifications/{tenant}', [SuperAdmin\VerificationController::class, 'show'])->name('verifications.show');
+    Route::patch('/business-verifications/{tenant}/approve', [SuperAdmin\VerificationController::class, 'approve'])->name('verifications.approve');
+    Route::patch('/business-verifications/{tenant}/reject',  [SuperAdmin\VerificationController::class, 'reject'])->name('verifications.reject');
 });
 
 // ─── Admin Panel ─────────────────────────────────────────────────────────────

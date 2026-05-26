@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
@@ -39,6 +40,10 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
+            // Badge count for super-admin sidebar
+            'pendingVerificationsCount' => fn () => $request->user()?->hasRole('super_admin')
+                ? Tenant::where('verification_status', 'pending_verification')->count()
+                : null,
         ];
     }
 }
