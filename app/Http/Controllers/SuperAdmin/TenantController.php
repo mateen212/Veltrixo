@@ -53,7 +53,7 @@ class TenantController extends Controller
         ]);
 
         $result = $this->provisioningService->provision($data);
-
+        dd($result);
         return redirect()
             ->route('super-admin.tenants.show', $result['tenant'])
             ->with('success', "Tenant '{$result['tenant']->name}' provisioned successfully.");

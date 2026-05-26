@@ -43,6 +43,11 @@ class TenantSubscription extends Model
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return in_array($this->status, ['active', 'trial']);
+    }
+
+    public function isOnTrial(): bool
+    {
+        return $this->status === 'trial' && $this->trial_ends_at?->isFuture();
     }
 }

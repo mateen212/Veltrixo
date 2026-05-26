@@ -59,13 +59,14 @@ class TenantProvisioningService
 
             // Subscribe tenant to plan (use model field names)
             $tenant->tenantSubscription()->create([
-                'plan_id'      => $plan->id,
-                'status'       => 'trialing',
-                'billing_cycle'=> $data['billing_cycle'] ?? 'monthly',
-                'starts_at'    => now(),
-                'ends_at'      => now()->addDays((int) ($data['trial_days'] ?? 30)),
-                'amount'       => $data['amount'] ?? $plan->price_monthly ?? 0,
-                'meta'         => $data['subscription_meta'] ?? [],
+                'plan_id'       => $plan->id,
+                'status'        => 'trial',
+                'billing_cycle' => $data['billing_cycle'] ?? 'monthly',
+                'starts_at'     => now(),
+                'ends_at'       => now()->addDays((int) ($data['trial_days'] ?? 30)),
+                'trial_ends_at' => now()->addDays((int) ($data['trial_days'] ?? 30)),
+                'amount'        => $data['amount'] ?? $plan->price_monthly ?? 0,
+                'meta'          => !empty($data['subscription_meta']) ? $data['subscription_meta'] : null,
             ]);
 
             return [
