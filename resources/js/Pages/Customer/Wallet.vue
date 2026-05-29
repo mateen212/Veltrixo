@@ -1,136 +1,72 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head } from '@inertiajs/vue3'
 import CustomerLayout from '@/Layouts/CustomerLayout.vue'
-import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
-import AppModal from '@/Components/AppModal.vue'
-import TablePagination from '@/Components/TablePagination.vue'
-import {
-    BanknotesIcon, ArrowUpCircleIcon, ArrowDownCircleIcon, PlusCircleIcon,
-} from '@heroicons/vue/24/outline'
+import EmptyState from '@/Components/EmptyState.vue'
+import { WalletIcon, ArrowUpCircleIcon, ArrowDownCircleIcon } from '@heroicons/vue/24/outline'
 
-interface Wallet {
-    balance: number
-    total_credited: number
-    total_debited: number
-    status: string
-    is_below_threshold: boolean
-}
-interface Transaction {
-    id: number; type: 'credit' | 'debit'; amount: number
-    description: string; created_at: string
-}
-
-const props = defineProps<{
-    wallet?: Wallet | null
-    transactions?: { data: Transaction[]; meta?: any; links?: any[] } | null
-    recharges?: any[]
+defineProps<{
+    wallet:       any
+    transactions: any[]
 }>()
 
-const fmt = (n: number | undefined | null) => (+(n ?? 0)).toFixed(2)
-
-const showRecharge = ref(false)
-const form = useForm({ amount: 500, payment_method: 'jazzcash', payment_reference: '' })
-
-function submitRecharge() {
-    form.post(route('customer.wallet.recharge'), {
-        onSuccess: () => { showRecharge.value = false },
-    })
+function txType(type: string) {
+    return type === 'credit' ? 'success' : 'danger'
 }
 </script>
 
 <template>
     <Head title="My Wallet" />
-    <CustomerLayout title="My Wallet">
-        <!-- Balance Card -->
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 p-6 text-white shadow-xl mb-5">
-            <div class="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-white/5" />
-            <div class="absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-white/5" />
-            <div class="relative">
-                <div class="flex items-center gap-2 mb-1">
-                    <BanknotesIcon class="h-4 w-4 text-indigo-200" />
-                    <p class="text-sm text-indigo-200 font-medium">Available Balance</p>
+    <CustomerLayout title="Wallet">
+        <!-- Balance card -->
+        <div class="rounded-2xl p-6 mb-6 text-white"
+            style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); box-shadow: 0 8px 32px -4px rgba(79,70,229,0.35);">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
+                    <WalletIcon class="h-5 w-5 text-white/80" />
                 </div>
-                <p class="text-4xl font-bold tracking-tight">Rs {{ fmt(wallet?.balance) }}</p>
-                <div v-if="wallet?.is_below_threshold" class="mt-3 inline-flex items-center gap-1.5 bg-yellow-400/20 rounded-lg px-3 py-1.5 text-xs text-yellow-200 font-medium">
-                    ⚠ Low balance — recharge to avoid interruption
+                <div>
+                    <p class="text-xs text-white/60 uppercase tracking-wider">Available Balance</p>
+                    <p class="text-3xl font-bold font-display mt-0.5">{{ wallet?.balance }}</p>
                 </div>
-                <div class="flex gap-6 mt-4 pt-4 border-t border-white/10 text-sm text-indigo-200">
-                    <div class="flex items-center gap-1.5">
-                        <ArrowUpCircleIcon class="h-4 w-4 text-emerald-300" />
-                        <span>Credited: Rs {{ fmt(wallet?.total_credited) }}</span>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                        <ArrowDownCircleIcon class="h-4 w-4 text-red-300" />
-                        <span>Debited: Rs {{ fmt(wallet?.total_debited) }}</span>
-                    </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-white/10 px-4 py-3">
+                    <p class="text-xs text-white/50">Total Recharged</p>
+                    <p class="text-base font-semibold mt-0.5">{{ wallet?.total_credit ?? '—' }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 px-4 py-3">
+                    <p class="text-xs text-white/50">Total Spent</p>
+                    <p class="text-base font-semibold mt-0.5">{{ wallet?.total_debit ?? '—' }}</p>
                 </div>
             </div>
         </div>
 
-        <!-- Recharge button -->
-        <div class="mb-5">
-            <AppButton @click="showRecharge = true">
-                <PlusCircleIcon class="h-4 w-4" />Recharge Wallet
-            </AppButton>
-        </div>
-
-        <!-- Transaction History -->
-        <div class="bg-white rounded-xl ring-1 ring-gray-100 shadow-sm overflow-hidden">
-            <div class="px-5 py-3.5 border-b border-gray-100">
-                <h2 class="text-sm font-semibold text-gray-800">Transaction History</h2>
+        <!-- Transactions -->
+        <div class="card overflow-hidden">
+            <div class="px-6 py-4 border-b border-border-muted">
+                <h2 class="text-sm font-semibold text-ink">Transaction History</h2>
             </div>
-            <div v-if="!transactions?.data?.length" class="py-12 text-center">
-                <BanknotesIcon class="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                <p class="text-sm text-gray-400">No transactions yet</p>
-            </div>
-            <div v-else class="divide-y divide-gray-50">
-                <div v-for="tx in transactions!.data" :key="tx.id"
-                    class="flex items-center justify-between px-5 py-3.5">
-                    <div>
-                        <p class="text-sm font-medium text-gray-800">{{ tx.description }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">{{ new Date(tx.created_at).toLocaleString() }}</p>
+            <div v-if="transactions.length" class="divide-y divide-border-muted">
+                <div v-for="tx in transactions" :key="tx.id"
+                    class="flex items-center gap-3 px-6 py-3.5 hover:bg-surface-subtle transition-colors">
+                    <div :class="['h-9 w-9 rounded-xl flex items-center justify-center shrink-0',
+                        tx.type === 'credit' ? 'bg-emerald-50' : 'bg-red-50']">
+                        <component :is="tx.type === 'credit' ? ArrowUpCircleIcon : ArrowDownCircleIcon"
+                            :class="['h-5 w-5', tx.type === 'credit' ? 'text-emerald-600' : 'text-red-500']" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-ink">{{ tx.description ?? tx.type }}</p>
+                        <p class="text-xs text-ink-faint">{{ tx.created_at }}</p>
                     </div>
                     <span :class="['text-sm font-semibold', tx.type === 'credit' ? 'text-emerald-600' : 'text-red-500']">
-                        {{ tx.type === 'credit' ? '+' : '-' }}Rs {{ tx.amount }}
+                        {{ tx.type === 'credit' ? '+' : '-' }}{{ tx.amount }}
                     </span>
                 </div>
             </div>
-            <TablePagination v-if="transactions" :meta="transactions.meta" :links="transactions.links" />
+            <div v-else class="py-14 px-6">
+                <EmptyState icon="wallet" title="No transactions yet" description="Your transaction history will appear here." />
+            </div>
         </div>
-
-        <!-- Recharge Modal -->
-        <AppModal v-if="showRecharge" title="Recharge Wallet" @close="showRecharge = false">
-            <form @submit.prevent="submitRecharge" class="space-y-4">
-                <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-gray-700">Amount (Rs)</label>
-                    <input v-model.number="form.amount" type="number" min="1"
-                        class="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" required />
-                    <p v-if="form.errors.amount" class="text-xs text-red-600">{{ form.errors.amount }}</p>
-                </div>
-                <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-gray-700">Payment Method</label>
-                    <select v-model="form.payment_method"
-                        class="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40">
-                        <option value="jazzcash">JazzCash</option>
-                        <option value="easypaisa">EasyPaisa</option>
-                        <option value="bank_transfer">Bank Transfer</option>
-                        <option value="cash">Cash</option>
-                        <option value="card">Debit/Credit Card</option>
-                    </select>
-                </div>
-                <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-gray-700">Reference / UTR <span class="text-gray-400 font-normal">(optional)</span></label>
-                    <input v-model="form.payment_reference" type="text"
-                        class="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
-                </div>
-            </form>
-            <template #footer>
-                <AppButton variant="outline" @click="showRecharge = false">Cancel</AppButton>
-                <AppButton :loading="form.processing" @click="submitRecharge">Submit Request</AppButton>
-            </template>
-        </AppModal>
     </CustomerLayout>
 </template>
-

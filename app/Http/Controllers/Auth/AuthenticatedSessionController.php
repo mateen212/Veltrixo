@@ -35,15 +35,25 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
+        $subdomain = optional($user->tenant)->subdomain;
+
+        if ($user->hasRole('super_admin')) {
+            return redirect()->intended(route('super-admin.dashboard'));
+        }
+
+        if (! $subdomain) {
+            return redirect()->intended(route('super-admin.dashboard'));
+        }
+
         if ($user->hasRole('admin')) {
-            return redirect()->intended(route('admin.dashboard'));
+            return redirect()->intended(route('admin.dashboard', ['subdomain' => $subdomain]));
         }
 
         if ($user->hasRole('rider')) {
-            return redirect()->intended(route('rider.dashboard'));
+            return redirect()->intended(route('rider.dashboard', ['subdomain' => $subdomain]));
         }
 
-        return redirect()->intended(route('customer.dashboard'));
+        return redirect()->intended(route('customer.dashboard', ['subdomain' => $subdomain]));
     }
 
     /**

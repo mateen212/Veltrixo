@@ -1,3 +1,245 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── CSS Custom Properties ─────────────────────────────────── */
+:root {
+    --color-brand:          #4F46E5;
+    --color-brand-hover:    #4338CA;
+    --color-brand-light:    #EEF2FF;
+
+    --sidebar-width:        248px;
+    --topbar-height:        56px;
+
+    --radius-xs:  4px;
+    --radius-sm:  6px;
+    --radius:     8px;
+    --radius-md:  10px;
+    --radius-lg:  12px;
+    --radius-xl:  16px;
+    --radius-2xl: 20px;
+
+    --duration-fast:   100ms;
+    --duration-normal: 200ms;
+    --duration-slow:   350ms;
+    --ease-smooth:     cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out:        cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* ─── Base Layer ─────────────────────────────────────────────── */
+@layer base {
+    html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-surface-muted text-ink font-sans;
+    }
+
+    *:focus-visible {
+        @apply outline-none ring-2 ring-brand-500/40 ring-offset-1;
+    }
+
+    ::selection {
+        background: rgba(99, 102, 241, 0.15);
+        color: #4F46E5;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar          { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track    { background: transparent; }
+    ::-webkit-scrollbar-thumb    { @apply bg-border-strong rounded-full; }
+    ::-webkit-scrollbar-thumb:hover { @apply bg-ink-faint; }
+}
+
+/* ─── Component Layer ────────────────────────────────────────── */
+@layer components {
+
+    /* Buttons */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 font-semibold rounded-lg
+               transition-all duration-150 focus:outline-none focus-visible:ring-2
+               focus-visible:ring-brand-500/40 focus-visible:ring-offset-1
+               disabled:opacity-50 disabled:cursor-not-allowed select-none;
+    }
+    .btn-primary  { @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm hover:shadow-md active:scale-[0.98]; }
+    .btn-secondary{ @apply btn bg-surface-subtle text-ink-secondary hover:bg-border border border-border; }
+    .btn-ghost    { @apply btn bg-transparent text-ink-secondary hover:bg-surface-subtle; }
+    .btn-danger   { @apply btn bg-red-600 text-white hover:bg-red-700 shadow-sm; }
+    .btn-outline  { @apply btn bg-white text-ink-secondary border border-border hover:border-border-strong hover:bg-surface-subtle; }
+
+    .btn-sm  { @apply px-3 py-1.5 text-xs; }
+    .btn-md  { @apply px-4 py-2.5 text-sm; }
+    .btn-lg  { @apply px-6 py-3 text-sm font-semibold; }
+    .btn-xl  { @apply px-8 py-3.5 text-base font-semibold; }
+    .btn-icon-sm { @apply p-1.5; }
+    .btn-icon-md { @apply p-2; }
+
+    /* Cards */
+    .card {
+        @apply bg-white rounded-xl border border-border shadow-xs;
+    }
+    .card-elevated {
+        @apply bg-white rounded-xl shadow-card border border-border;
+    }
+    .card-interactive {
+        @apply card transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer;
+    }
+
+    /* Form elements */
+    .field-label {
+        @apply block text-sm font-medium text-ink-secondary mb-1.5;
+    }
+    .field-input {
+        @apply w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink
+               placeholder-ink-faint shadow-xs transition-all duration-150
+               focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15;
+    }
+    .field-input-error {
+        @apply field-input border-red-400 focus:border-red-500 focus:ring-red-500/15;
+    }
+    .field-error {
+        @apply mt-1.5 text-xs text-red-600 flex items-center gap-1;
+    }
+    .field-hint {
+        @apply mt-1.5 text-xs text-ink-muted;
+    }
+
+    /* Section headers */
+    .section-title {
+        @apply text-xs font-semibold uppercase tracking-[0.1em] text-ink-faint;
+    }
+
+    /* Divider */
+    .divider {
+        @apply border-t border-border-muted;
+    }
+
+    /* Page layout helpers */
+    .page-header {
+        @apply mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4;
+    }
+    .page-title {
+        @apply text-xl font-bold text-ink font-display;
+    }
+    .page-subtitle {
+        @apply mt-0.5 text-sm text-ink-muted;
+    }
+
+    /* Status dot */
+    .status-dot-online  { @apply h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]; }
+    .status-dot-offline { @apply h-2 w-2 rounded-full bg-gray-300; }
+    .status-dot-warning { @apply h-2 w-2 rounded-full bg-amber-500; }
+    .status-dot-danger  { @apply h-2 w-2 rounded-full bg-red-500; }
+
+    /* Skeleton loader */
+    .skeleton {
+        @apply relative overflow-hidden bg-border-muted rounded;
+        background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.7) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite linear;
+    }
+
+    /* Table */
+    .data-table {
+        @apply w-full text-sm;
+    }
+    .data-table thead tr {
+        @apply border-b border-border-muted;
+    }
+    .data-table thead th {
+        @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-faint bg-surface-muted/60;
+    }
+    .data-table tbody tr {
+        @apply border-b border-border-muted last:border-0 transition-colors duration-100;
+    }
+    .data-table tbody tr:hover {
+        @apply bg-surface-muted/40;
+    }
+    .data-table td {
+        @apply px-4 py-3.5;
+    }
+
+    /* Navigation items (sidebar) */
+    .nav-item {
+        @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 border border-transparent;
+    }
+    .nav-item-active {
+        @apply bg-brand-600/20 text-white border-brand-500/25;
+    }
+    .nav-item-inactive {
+        @apply text-white/60 hover:bg-white/[0.06] hover:text-white;
+    }
+
+    /* Badges */
+    .badge {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+    }
+    .badge-success { @apply badge bg-emerald-50  text-emerald-700 ring-1 ring-emerald-200; }
+    .badge-warning { @apply badge bg-amber-50   text-amber-700  ring-1 ring-amber-200; }
+    .badge-danger  { @apply badge bg-red-50     text-red-700    ring-1 ring-red-200; }
+    .badge-info    { @apply badge bg-blue-50    text-blue-700   ring-1 ring-blue-200; }
+    .badge-neutral { @apply badge bg-gray-100   text-gray-600   ring-1 ring-gray-200; }
+    .badge-brand   { @apply badge bg-brand-50   text-brand-700  ring-1 ring-brand-200; }
+    .badge-purple  { @apply badge bg-purple-50  text-purple-700 ring-1 ring-purple-200; }
+
+    /* KPI cards */
+    .kpi-card {
+        @apply card p-5 flex items-start gap-4;
+    }
+    .kpi-icon {
+        @apply flex h-10 w-10 items-center justify-center rounded-xl shrink-0;
+    }
+
+    /* Gradient text */
+    .text-gradient {
+        @apply bg-clip-text text-transparent bg-brand-gradient;
+    }
+
+    /* Glass surface */
+    .glass {
+        @apply bg-white/10 backdrop-blur-sm border border-white/10;
+    }
+
+    /* Focus ring */
+    .focus-ring {
+        @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1;
+    }
+}
+
+/* ─── Utility Layer ──────────────────────────────────────────── */
+@layer utilities {
+    .scrollbar-none { scrollbar-width: none; }
+    .scrollbar-none::-webkit-scrollbar { display: none; }
+
+    .text-balance { text-wrap: balance; }
+
+    .will-change-transform { will-change: transform; }
+    .will-change-opacity   { will-change: opacity; }
+
+    /* Stagger delays for list animations */
+    .stagger-1 { animation-delay: 50ms; }
+    .stagger-2 { animation-delay: 100ms; }
+    .stagger-3 { animation-delay: 150ms; }
+    .stagger-4 { animation-delay: 200ms; }
+    .stagger-5 { animation-delay: 250ms; }
+    .stagger-6 { animation-delay: 300ms; }
+
+    /* Truncate multi-line */
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+}

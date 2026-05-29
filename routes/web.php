@@ -90,11 +90,11 @@ Route::domain('{subdomain}.' . config('tenancy.app_domain'))
     )->name('tenant.home');
 
     // Tenant dashboard router (dispatches to role-specific dashboard)
-    Route::get('/dashboard', function () {
+    Route::get('/dashboard', function (string $subdomain) {
         $user = auth()->user();
-        if ($user->hasRole('admin'))  return redirect()->route('admin.dashboard');
-        if ($user->hasRole('rider'))  return redirect()->route('rider.dashboard');
-        return redirect()->route('customer.dashboard');
+        if ($user->hasRole('admin'))  return redirect()->route('admin.dashboard', ['subdomain' => $subdomain]);
+        if ($user->hasRole('rider'))  return redirect()->route('rider.dashboard', ['subdomain' => $subdomain]);
+        return redirect()->route('customer.dashboard', ['subdomain' => $subdomain]);
     })->middleware(['auth', 'verified', 'tenant.user'])->name('tenant.dashboard');
 
     // ── Tenant profile ────────────────────────────────────────────────────────

@@ -1,123 +1,80 @@
 <script setup lang="ts">
+import { Head, Link } from '@inertiajs/vue3'
 import SuperAdminLayout from '@/Layouts/SuperAdminLayout.vue'
-import { Link } from '@inertiajs/vue3'
-import {
-    BuildingOfficeIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    TruckIcon,
-} from '@heroicons/vue/24/outline'
+import KpiCard from '@/Components/KpiCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { BuildingOfficeIcon, ArrowRightIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps<{
-    stats: {
-        total_tenants: number
-        active_tenants: number
-        trial_tenants: number
-        monthly_revenue: string
-        deliveries_today: number
-    }
-    recentTenants: Array<{
-        id: number
-        name: string
-        slug: string
-        status: string
-        owner_name: string
-        owner_email: string
-        trial_ends: string
-        created_at: string
-    }>
+defineProps<{
+    totalTenants:          number
+    activeTenants:         number
+    totalRevenue:          number | string
+    pendingVerifications:  number
+    recentTenants:         Array<{ id: number; name: string; status: string; created_at: string; plan?: string }>
 }>()
 
-const statCards = [
-    { label: 'Total Tenants',     value: () => props.stats.total_tenants,    icon: BuildingOfficeIcon, color: 'indigo' },
-    { label: 'Active Tenants',    value: () => props.stats.active_tenants,   icon: CheckCircleIcon,    color: 'green' },
-    { label: 'In Trial',          value: () => props.stats.trial_tenants,    icon: ClockIcon,          color: 'amber' },
-    { label: 'Monthly Revenue',   value: () => props.stats.monthly_revenue,  icon: CurrencyDollarIcon, color: 'blue' },
-    { label: 'Deliveries Today',  value: () => props.stats.deliveries_today, icon: TruckIcon,          color: 'purple' },
-]
-
-const statusColors: Record<string, string> = {
-    active:    'bg-green-100 text-green-700',
-    suspended: 'bg-red-100 text-red-700',
-    trial:     'bg-amber-100 text-amber-700',
-    inactive:  'bg-gray-100 text-gray-600',
-}
-
-const iconColors: Record<string, string> = {
-    indigo: 'bg-indigo-100 text-indigo-600',
-    green:  'bg-green-100 text-green-600',
-    amber:  'bg-amber-100 text-amber-600',
-    blue:   'bg-blue-100 text-blue-600',
-    purple: 'bg-purple-100 text-purple-600',
+const statusMap: Record<string, any> = {
+    active: 'success', inactive: 'neutral', suspended: 'danger', pending: 'warning',
 }
 </script>
 
 <template>
-    <SuperAdminLayout title="Platform Dashboard">
+    <Head title="Super Admin Dashboard" />
+    <SuperAdminLayout title="Dashboard">
         <!-- KPI cards -->
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5 mb-8">
-            <div v-for="card in statCards" :key="card.label"
-                class="rounded-xl bg-white shadow-sm border border-gray-100 p-5 flex items-start gap-4">
-                <div :class="['flex h-10 w-10 items-center justify-center rounded-lg shrink-0', iconColors[card.color]]">
-                    <component :is="card.icon" class="h-5 w-5" />
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KpiCard title="Total Tenants"   :value="totalTenants"         icon="building" color="blue" />
+            <KpiCard title="Active Tenants"  :value="activeTenants"        icon="check"    color="green" />
+            <KpiCard title="Revenue (MRR)"   :value="totalRevenue"         icon="currency" color="indigo" />
+            <KpiCard title="Pending Verify"  :value="pendingVerifications" icon="clock"    color="yellow" />
+        </div>
+
+        <!-- Recent tenants -->
+        <div class="card overflow-hidden mb-6">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-border-muted">
+                <h2 class="text-sm font-semibold text-ink">Recent Tenants</h2>
+                <Link :href="route('super-admin.tenants.index')"
+                    class="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 transition-colors">
+                    View all <ArrowRightIcon class="h-3 w-3" />
+                </Link>
+            </div>
+
+            <div v-if="recentTenants.length" class="divide-y divide-border-muted">
+                <div v-for="t in recentTenants" :key="t.id"
+                    class="flex items-center justify-between px-6 py-3.5 hover:bg-surface-subtle transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="h-9 w-9 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                            <BuildingOfficeIcon class="h-4 w-4 text-violet-500" />
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-ink">{{ t.name }}</p>
+                            <p class="text-xs text-ink-faint">{{ t.created_at }} · {{ t.plan ?? '—' }}</p>
+                        </div>
+                    </div>
+                    <AppBadge :variant="statusMap[t.status] ?? 'neutral'" dot size="xs">{{ t.status }}</AppBadge>
                 </div>
-                <div>
-                    <p class="text-2xl font-bold text-gray-900">{{ card.value() }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">{{ card.label }}</p>
-                </div>
+            </div>
+            <div v-else class="py-14 px-6">
+                <EmptyState icon="building" title="No tenants yet" description="Tenants will appear here once they register." />
             </div>
         </div>
 
-        <!-- Recent Tenants table -->
-        <div class="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <h2 class="font-semibold text-gray-900">Recent Tenants</h2>
-                <Link :href="route('super-admin.tenants.index')"
-                    class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                    View all →
-                </Link>
+        <!-- Pending verifications CTA -->
+        <div v-if="pendingVerifications > 0"
+            class="rounded-2xl p-5 flex items-center justify-between"
+            style="background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(251,191,36,0.05)); border: 1px solid rgba(245,158,11,0.2);">
+            <div>
+                <p class="text-sm font-semibold text-ink">
+                    {{ pendingVerifications }} pending verification{{ pendingVerifications !== 1 ? 's' : '' }} awaiting review
+                </p>
+                <p class="text-xs text-ink-muted mt-0.5">Businesses waiting for admin approval</p>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-100 text-sm">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Business</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trial Ends</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Joined</th>
-                            <th class="px-6 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="tenant in recentTenants" :key="tenant.id"
-                            class="hover:bg-gray-50/50 transition-colors">
-                            <td class="px-6 py-4 font-medium text-gray-900">{{ tenant.name }}</td>
-                            <td class="px-6 py-4 text-gray-600">
-                                <div>{{ tenant.owner_name }}</div>
-                                <div class="text-xs text-gray-400">{{ tenant.owner_email }}</div>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span :class="['inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize', statusColors[tenant.status] ?? 'bg-gray-100 text-gray-600']">
-                                    {{ tenant.status }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-gray-500">{{ tenant.trial_ends }}</td>
-                            <td class="px-6 py-4 text-gray-500">{{ tenant.created_at }}</td>
-                            <td class="px-6 py-4 text-right">
-                                <Link :href="route('super-admin.tenants.show', tenant.id)"
-                                    class="text-indigo-600 hover:text-indigo-800 font-medium text-xs">
-                                    View
-                                </Link>
-                            </td>
-                        </tr>
-                        <tr v-if="!recentTenants.length">
-                            <td colspan="6" class="px-6 py-12 text-center text-gray-400">No tenants yet.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <Link :href="route('super-admin.verifications.index')"
+                class="btn btn-sm rounded-xl font-semibold text-amber-700"
+                style="background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);">
+                Review Now
+            </Link>
         </div>
     </SuperAdminLayout>
 </template>

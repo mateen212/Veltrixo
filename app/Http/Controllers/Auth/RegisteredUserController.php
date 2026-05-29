@@ -49,6 +49,12 @@ class RegisteredUserController extends Controller
 
         $user->assignRole('customer');
 
-        return redirect(route('customer.dashboard'));
+        $subdomain = optional($user->fresh()->tenant)->subdomain;
+
+        if (! $subdomain) {
+            return redirect('/');
+        }
+
+        return redirect(route('customer.dashboard', ['subdomain' => $subdomain]));
     }
 }

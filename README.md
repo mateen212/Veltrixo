@@ -27,6 +27,7 @@
 - [Architecture Overview](#architecture-overview)
 - [Subdomain Multi-Tenancy](#subdomain-multi-tenancy)
 - [Tech Stack](#tech-stack)
+- [Design System](#design-system)
 - [Business Workflows](#business-workflows)
   - [Business Signup & Verification](#business-signup--verification)
   - [Super Admin](#super-admin-flow)
@@ -130,6 +131,16 @@ Veltrixo does exactly that. One installation can power **multiple completely iso
 - **Referral system** — earn credit for referrals
 - **Notification centre** — delivery updates, alerts
 - **Multiple addresses** — home, office, etc.
+
+### UI & Design
+- **Enterprise design system** — Stripe/Linear/Vercel-inspired, not template-like
+- **Dark canvas sidebars** — `#0C0C1D` base with brand accent navigation
+- **Fully responsive** — mobile-first layouts across all portals
+- **Smooth animations** — CSS scroll-reveal, GSAP, `@vueuse/motion`
+- **Live charts** — ApexCharts for KPI visualisations
+- **Component library** — 10 shared Vue components (KpiCard, DataTable, AppBadge, etc.)
+- **Split-screen auth pages** — dark brand panel + clean form panel
+- **Landing page** — animated hero, feature grid, pricing cards, CSS IntersectionObserver reveals
 
 ### Technical
 - **Server-side rendering (SSR)** via Inertia.js + Vue 3
@@ -241,6 +252,31 @@ Request: freshmilk.veltrixo.com/admin/dashboard
    Controller handles request
 ```
 
+### Login redirect — subdomain routing
+
+After successful login, `AuthenticatedSessionController` loads the user's tenant and passes the `subdomain` route parameter to all tenant route redirects:
+
+```php
+// app/Http/Controllers/Auth/AuthenticatedSessionController.php
+$subdomain = optional($user->tenant)->subdomain;
+
+if ($user->hasRole('super_admin')) {
+    return redirect()->intended(route('super-admin.dashboard'));
+}
+
+if ($user->hasRole('admin')) {
+    return redirect()->intended(route('admin.dashboard', ['subdomain' => $subdomain]));
+}
+
+if ($user->hasRole('rider')) {
+    return redirect()->intended(route('rider.dashboard', ['subdomain' => $subdomain]));
+}
+
+return redirect()->intended(route('customer.dashboard', ['subdomain' => $subdomain]));
+```
+
+This is required because tenant routes are defined inside a `Route::domain('{subdomain}.' . config('tenancy.app_domain'))` group — the `{subdomain}` parameter must always be supplied explicitly.
+
 ### Central domain (veltrixo.com)
 
 The super admin panel and public pages live on the root domain, protected by `only.central` middleware — if a tenant subdomain is detected, it aborts 404. This ensures tenant users cannot access the super admin panel even if they guess the URL.
@@ -336,13 +372,16 @@ Jobs operating on a `Delivery` model (no tenantId) resolve tenant context inline
 
 | Layer | Technology |
 |---|---|
-| Framework | Vue 3 (Composition API) |
+| Framework | Vue 3 (Composition API + `<script setup>`) |
 | Routing | Inertia.js 2.x (SPA + SSR) |
 | Type Safety | TypeScript 5.x |
-| Styling | Tailwind CSS 3.x |
-| Icons | Heroicons v2 |
+| Styling | Tailwind CSS 3.x (PostCSS) |
+| Icons | Heroicons v2 (24/outline + 24/solid) |
+| Fonts | Inter · Plus Jakarta Sans · JetBrains Mono (Google Fonts) |
+| Animation | GSAP 3.x · @vueuse/motion 3.x |
+| Charts | ApexCharts 5.x · vue3-apexcharts |
 | Maps | Leaflet.js (business signup geo-pin) |
-| Build | Vite 6 |
+| Build | Vite 8 |
 | SSR | Node.js (ssr.ts) |
 
 ### Infrastructure
@@ -356,6 +395,100 @@ Jobs operating on a `Delivery` model (no tenantId) resolve tenant context inline
 | Object Storage | S3-compatible (AWS / MinIO) |
 | Dev Environment | Laradock (Docker Compose) |
 | Container | Docker (PHP 8.4-FPM Alpine) |
+
+---
+
+## Design System
+
+Veltrixo ships a full enterprise design system — built on Tailwind CSS v3 — so all portals share consistent tokens, components, and typography.
+
+### Design tokens (`tailwind.config.js`)
+
+```js
+colors: {
+  brand:   { DEFAULT: '#6366F1', ... },              // indigo-500 — primary actions
+  surface: { DEFAULT: '#FFFFFF', muted: '#F9FAFB' }, // page backgrounds
+  ink:     { DEFAULT: '#111827', muted: '#6B7280' }, // text hierarchy
+  border:  { DEFAULT: '#E5E7EB', muted: '#F3F4F6', strong: '#D1D5DB' },
+  canvas:  { DEFAULT: '#0C0C1D', border: '#1E1E3A' }, // dark sidebar
+}
+
+// Class usage:
+// bg-surface-muted   text-ink-muted   border-border   bg-canvas
+```
+
+> **Tailwind v3 important**: The `DEFAULT` key maps to a class **without** the `-DEFAULT` suffix.
+> `border.DEFAULT = '#E5E7EB'` → use class `border-border` (not `border-border-DEFAULT`).
+
+### Typography
+
+```css
+/* Loaded via Google Fonts in resources/views/app.blade.php */
+--font-sans:    'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+--font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
+--font-mono:    'JetBrains Mono', monospace;
+```
+
+Inter (300–700) and Plus Jakarta Sans (400–800) cover all UI text. JetBrains Mono covers codes, tokens, and reference numbers.
+
+### Component layer (`resources/css/app.css`)
+
+Pre-built CSS component classes available across all pages:
+
+| Class | Description |
+|---|---|
+| `btn btn-primary` | Brand-coloured CTA button |
+| `btn btn-secondary` | Ghost/outline button |
+| `btn btn-ghost` | Transparent button |
+| `btn btn-sm / btn-md / btn-lg` | Size modifiers |
+| `btn btn-danger` | Destructive action button |
+| `card` | White surface card with border + shadow |
+| `field-input` | Styled text input with focus ring |
+| `page-header` | Page title + subtitle wrapper |
+| `page-title` | Large semi-bold heading |
+| `page-subtitle` | Muted supporting text |
+| `badge badge-{variant}` | Status pill (success, warning, danger, info, neutral) |
+
+### Shared Vue components (`resources/js/Components/`)
+
+| Component | Purpose |
+|---|---|
+| `AppButton.vue` | Button with variant/size props, loading state, icon slot |
+| `AppBadge.vue` | Pill badge — maps status strings to colors |
+| `KpiCard.vue` | Metric card with icon, value, delta indicator |
+| `StatCard.vue` | Simpler stat card for secondary metrics |
+| `DataTable.vue` | Table with slot-based columns, empty state, loading skeleton |
+| `TablePagination.vue` | Cursor/page-based pagination controls |
+| `AppToast.vue` | Toast notification stack (success / error / info / warning) |
+| `EmptyState.vue` | Empty-state block with icon, title, action button slot |
+| `AnimatedCounter.vue` | Counts up to a target number on mount (GSAP) |
+| `SkeletonLoader.vue` | Pulse skeleton blocks for async loading states |
+
+### Layouts
+
+| Layout | Used by | Description |
+|---|---|---|
+| `AdminLayout.vue` | Admin portal | Dark canvas sidebar + `h-14` topbar; brand indigo nav |
+| `CustomerLayout.vue` | Customer portal | Same sidebar pattern; nav: Overview / Subscriptions / Deliveries / Wallet |
+| `RiderLayout.vue` | Rider portal | Mobile-first; includes online/offline status toggle |
+| `SuperAdminLayout.vue` | Super admin | Violet-600 accents, pending verifications badge |
+| `GuestLayout.vue` | Auth pages | Minimal centered wrapper, `bg-surface-muted` |
+| `AuthenticatedLayout.vue` | Generic auth pages | Topbar-only (no sidebar) |
+
+### Auth pages
+
+All auth pages use a **split-screen layout** — a dark brand gradient panel on the left, a clean form panel on the right:
+
+```
+┌──────────────────────┬──────────────────────────────────┐
+│  Dark brand panel    │  Form panel                      │
+│  #1a1a3e → #0c0c1d   │  bg-white / bg-surface-muted    │
+│  Logo + tagline      │  field-input + btn-primary       │
+│  Animated quote      │  Social proof / links            │
+└──────────────────────┴──────────────────────────────────┘
+```
+
+Pages: `Login`, `Register`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`, `ConfirmPassword`.
 
 ---
 
@@ -440,9 +573,10 @@ The Super Admin is the platform owner — they manage the SaaS infrastructure, v
 The Admin is the business owner or operations manager for a specific tenant. They access their portal at `{subdomain}.veltrixo.com/admin/dashboard`.
 
 **Logging in:**
-- Admin navigates to `alnoor.veltrixo.com/login`
+- Admin navigates to `alnoor.veltrixo.test/login`
 - `InitializeTenancyBySubdomain` resolves the tenant from the subdomain
-- After login, `tenant.user` middleware verifies their `tenant_id` matches
+- After login, `AuthenticatedSessionController` reads `$user->tenant->subdomain` and redirects to `route('admin.dashboard', ['subdomain' => $subdomain])`
+- `tenant.user` middleware verifies their `tenant_id` matches
 - Lands on `/admin/dashboard` with today's delivery summary
 
 **Managing products:**
@@ -484,7 +618,7 @@ The Rider is the delivery person. Their portal is a **mobile-first Progressive W
 
 **Starting the day:**
 1. Opens Veltrixo on phone browser (PWA on home screen)
-2. Logs in → lands on `/rider/dashboard`
+2. Logs in → redirected to `/rider/dashboard` on their tenant's subdomain
 3. Sees today's assigned deliveries
 4. Toggles the **Online** switch — broadcasts real-time availability to admin
 
@@ -691,6 +825,10 @@ Veltrixo/
 │   ├── Http/
 │   │   ├── Controllers/
 │   │   │   ├── Admin/        # Admin panel controllers
+│   │   │   ├── Auth/
+│   │   │   │   ├── AuthenticatedSessionController.php  # Login → subdomain redirect
+│   │   │   │   ├── RegisteredUserController.php        # Register → subdomain redirect
+│   │   │   │   └── ...
 │   │   │   ├── Business/     # Public signup + super admin verification
 │   │   │   ├── Customer/     # Customer portal controllers
 │   │   │   ├── Rider/        # Rider app controllers
@@ -718,7 +856,7 @@ Veltrixo/
 │   ├── Models/               # Eloquent models (with HasTenant trait)
 │   ├── Notifications/
 │   │   └── Business/
-│   │       ├── BusinessApproved.php      # Uses TenantUrl for dashboard link
+│   │       ├── BusinessApproved.php
 │   │       ├── BusinessRejected.php
 │   │       ├── BusinessSignupReceived.php
 │   │       └── SuperAdminNewBusinessAlert.php
@@ -734,7 +872,7 @@ Veltrixo/
 │   │   ├── Report/
 │   │   ├── Subscription/
 │   │   ├── Tenant/
-│   │   │   ├── BusinessSignupService.php  # register(), approve(), reject()
+│   │   │   ├── BusinessSignupService.php
 │   │   │   └── TenantProvisioningService.php
 │   │   └── Wallet/
 │   ├── Settings/             # Spatie settings classes
@@ -754,44 +892,85 @@ Veltrixo/
 │   ├── seeders/              # Demo data (PKR pricing)
 │   └── factories/            # Model factories for testing
 │
-├── resources/js/
-│   ├── Components/           # Reusable UI components
-│   │   ├── AppButton.vue
-│   │   ├── AppBadge.vue
-│   │   ├── AppCard.vue
-│   │   ├── AppModal.vue
-│   │   ├── AppInput.vue
-│   │   ├── AppToast.vue
-│   │   ├── DataTable.vue
-│   │   └── TablePagination.vue
-│   ├── Layouts/
-│   │   ├── AdminLayout.vue   # Dark sidebar CMS layout
-│   │   ├── CustomerLayout.vue
-│   │   └── RiderLayout.vue   # Mobile-first rider layout
-│   ├── Pages/
-│   │   ├── Admin/            # Admin panel pages
-│   │   ├── Business/
-│   │   │   ├── Register.vue  # 3-step signup wizard (Leaflet map, subdomain)
-│   │   │   └── Pending.vue   # Waiting for approval
-│   │   ├── Customer/
-│   │   ├── Errors/
-│   │   │   ├── TenantNotFound.vue    # 404: unknown subdomain
-│   │   │   └── TenantSuspended.vue   # 403: suspended account
-│   │   └── Rider/
-│   └── stores/               # Pinia stores (if used)
+├── resources/
+│   ├── css/
+│   │   └── app.css           # CSS variables + @layer components + @layer utilities
+│   ├── views/
+│   │   └── app.blade.php     # Root HTML: Google Fonts, Vite assets, SSR entry
+│   └── js/
+│       ├── Components/
+│       │   ├── AppButton.vue        # variant/size/loading button
+│       │   ├── AppBadge.vue         # status pill badge
+│       │   ├── KpiCard.vue          # metric card with icon + delta
+│       │   ├── StatCard.vue         # secondary metric card
+│       │   ├── DataTable.vue        # slot-based table + empty state
+│       │   ├── TablePagination.vue  # pagination controls
+│       │   ├── AppToast.vue         # toast notification stack
+│       │   ├── EmptyState.vue       # empty-state with action slot
+│       │   ├── AnimatedCounter.vue  # GSAP count-up on mount
+│       │   └── SkeletonLoader.vue   # pulse skeleton blocks
+│       ├── Layouts/
+│       │   ├── AdminLayout.vue         # Dark sidebar (bg-canvas), brand nav
+│       │   ├── CustomerLayout.vue      # Customer portal sidebar
+│       │   ├── RiderLayout.vue         # Mobile-first, online/offline toggle
+│       │   ├── SuperAdminLayout.vue    # Violet accent, verifications badge
+│       │   ├── GuestLayout.vue         # Minimal centered wrapper (auth pages)
+│       │   └── AuthenticatedLayout.vue # Topbar-only layout
+│       └── Pages/
+│           ├── Welcome.vue          # Landing page (CSS reveal animations)
+│           ├── Dashboard.vue        # Generic authenticated dashboard
+│           ├── Admin/
+│           │   ├── Dashboard.vue
+│           │   ├── Analytics/Index.vue
+│           │   ├── Deliveries/Index.vue
+│           │   ├── Products/Index.vue  Create.vue  Edit.vue  Show.vue
+│           │   ├── Riders/Index.vue
+│           │   ├── Subscriptions/Index.vue  Show.vue
+│           │   └── Wallets/Index.vue
+│           ├── Auth/
+│           │   ├── Login.vue            # Split-screen: dark brand + form
+│           │   ├── Register.vue
+│           │   ├── ForgotPassword.vue
+│           │   ├── ResetPassword.vue
+│           │   ├── VerifyEmail.vue
+│           │   └── ConfirmPassword.vue
+│           ├── Business/
+│           │   ├── Register.vue         # 3-step wizard (Leaflet map, subdomain)
+│           │   └── Pending.vue          # Waiting for approval
+│           ├── Customer/
+│           │   ├── Dashboard.vue
+│           │   ├── Wallet.vue
+│           │   ├── Deliveries/Index.vue  Show.vue
+│           │   └── Subscriptions/Index.vue  Show.vue
+│           ├── Errors/
+│           │   ├── TenantNotFound.vue   # 404: unknown subdomain
+│           │   └── TenantSuspended.vue  # 403: suspended account
+│           ├── Rider/
+│           │   ├── Dashboard.vue
+│           │   └── Deliveries/Index.vue
+│           ├── SuperAdmin/
+│           │   ├── Dashboard.vue
+│           │   ├── Plans/Index.vue
+│           │   ├── Tenants/Index.vue
+│           │   └── Verifications/Index.vue  Show.vue
+│           └── Profile/
+│               └── Edit.vue
 │
 ├── routes/
 │   ├── web.php               # Domain-grouped routes (central + tenant subdomain)
+│   │                         # Tenant route closures accept (string $subdomain)
 │   ├── auth.php              # Domain-agnostic auth routes
 │   ├── api.php               # REST API routes
 │   └── channels.php          # Broadcast channel auth
 │
 ├── docker/
 │   ├── nginx/
-│   │   └── delivery-saas.conf  # Nginx: wildcard *.veltrixo.com, Host header pass
-│   └── supervisor/             # Supervisor: PHP-FPM + Horizon + Reverb
+│   │   └── delivery-saas.conf
+│   └── supervisor/
 │
-└── Dockerfile                  # Production Docker image (PHP 8.4-FPM Alpine)
+├── tailwind.config.js        # Design token system (brand/surface/ink/border/canvas)
+├── postcss.config.js         # tailwindcss + autoprefixer
+└── Dockerfile                # Production Docker image (PHP 8.4-FPM Alpine)
 ```
 
 ---
@@ -815,17 +994,14 @@ Veltrixo uses named queues for priority control, monitored by Laravel Horizon.
 
 **Tenant context in queued jobs:**
 
-Jobs know which tenant they belong to via the `WithTenantContext` job middleware. This restores the `TenantContext` singleton before `handle()` runs, so any service called inside the job that reads `TenantContext::get()` will see the correct tenant.
-
 ```php
-// Jobs with tenantId in constructor (GenerateDeliveriesJob, GenerateAnalyticsReportJob)
+// Jobs with tenantId in constructor
 public function middleware(): array
 {
     return [new WithTenantContext($this->tenantId)];
 }
 
-// Jobs that load a Delivery (GenerateInvoiceJob, ProcessWalletDeductionJob, SendDeliveryReceiptJob)
-// Resolve tenant from $delivery->tenant_id inside handle()
+// Jobs that load a Delivery — resolve tenant inline from $delivery->tenant_id
 ```
 
 **Scheduled jobs:**
@@ -880,7 +1056,6 @@ Every tenant gets their own subdomain. `InitializeTenancyBySubdomain` resolves t
 Every data model uses the `HasTenant` trait, which registers a `GlobalScope` that automatically appends `WHERE tenant_id = ?` to every query.
 
 ```php
-// Automatically applied to every query on a tenant-scoped model:
 SELECT * FROM deliveries WHERE tenant_id = 42 AND ...
 ```
 
@@ -904,15 +1079,14 @@ Delivery::withoutGlobalScope(TenantScope::class)->where(...)->get();
 - Docker + Docker Compose
 - Laradock (cloned alongside this project)
 - Node.js 20+ (on host, for asset building)
-- Python 3 (on host, for DNS testing if using dnsmasq)
 
 ### Directory Structure
 
 ```
 ~/projects/
-├── laradock/           ← Laradock Docker setup
+├── laradock/
 └── laravel/
-    └── Veltrixo/       ← This project
+    └── Veltrixo/
 ```
 
 ### Step 1 — Clone the project
@@ -929,8 +1103,6 @@ docker compose up -d nginx mysql redis workspace
 ```
 
 ### Step 3 — Enter the workspace container
-
-All backend commands must be run inside Docker:
 
 ```bash
 docker compose exec workspace bash
@@ -973,11 +1145,17 @@ npm install
 npm run build
 ```
 
-### Step 8 — Set up storage symlink (inside container)
+### Step 8 — Set up storage symlink and permissions
 
 ```bash
 php artisan storage:link
+chmod -R 775 /var/www/Veltrixo/storage /var/www/Veltrixo/bootstrap/cache
 ```
+
+> If the web server cannot write to storage (e.g. a file was created by a root-run artisan command), fix ownership:
+> ```bash
+> chown -R www-data:www-data /var/www/Veltrixo/storage /var/www/Veltrixo/bootstrap/cache
+> ```
 
 ### Step 9 — Set up local subdomain DNS
 
@@ -989,7 +1167,7 @@ Add entries to `/etc/hosts` on your host machine:
 127.0.0.1  alnoor.veltrixo.test
 ```
 
-For dynamic subdomain support without editing hosts for every tenant, install `dnsmasq`:
+For dynamic subdomain support, use `dnsmasq`:
 
 ```bash
 # macOS
@@ -1001,9 +1179,12 @@ sudo brew services start dnsmasq
 ### Step 10 — Visit the application
 
 ```
-http://veltrixo.test          → Super Admin (central domain)
-http://demo.veltrixo.test     → Demo tenant portal
+http://veltrixo.test           → Super Admin (central domain)
+http://demo.veltrixo.test      → Demo tenant portal
 ```
+
+Login as super admin: `superadmin@veltrixo.test` / `password`  
+Login as tenant admin: go to `http://demo.veltrixo.test/login` → `admin@demo.test` / `password`
 
 ---
 
@@ -1069,14 +1250,10 @@ VAPID_PRIVATE_KEY=
 
 ## Queue & Horizon Setup
 
-### Start queue workers (development)
-
-Inside the workspace container:
+### Development
 
 ```bash
 cd /var/www/Veltrixo
-
-# Start Horizon (monitors all queues)
 php artisan horizon
 ```
 
@@ -1085,17 +1262,12 @@ Horizon dashboard: `http://veltrixo.test/horizon` (super admin only)
 ### Run scheduled commands manually
 
 ```bash
-php artisan delivery:generate          # Generate today's deliveries
-php artisan delivery:mark-missed       # Flag incomplete deliveries
-php artisan analytics:generate-daily   # Aggregate KPIs
+php artisan delivery:generate
+php artisan delivery:mark-missed
+php artisan analytics:generate-daily
 ```
 
-### In production (Supervisor)
-
-The included `docker/supervisor/supervisord.conf` manages:
-- PHP-FPM process
-- Laravel Horizon worker
-- Laravel Reverb WebSocket server
+### Production (Supervisor)
 
 ```ini
 [program:horizon]
@@ -1116,14 +1288,10 @@ autorestart=true
 ### Development
 
 ```bash
-# Inside workspace container
-cd /var/www/Veltrixo
 php artisan reverb:start
 ```
 
-### Production (via Supervisor)
-
-Reverb runs on port 8080. Nginx proxies `/app/` path to it:
+### Production Nginx proxy
 
 ```nginx
 location /app/ {
@@ -1135,15 +1303,10 @@ location /app/ {
 }
 ```
 
-This proxying works on every subdomain because the Nginx wildcard config serves all `*.veltrixo.com`.
-
 ### Frontend (Echo)
-
-The Vue frontend connects to Reverb via Laravel Echo (configured in `resources/js/bootstrap.ts`):
 
 ```typescript
 import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
 
 window.Echo = new Echo({
     broadcaster: 'reverb',
@@ -1164,7 +1327,7 @@ The Rider portal is designed as a **Progressive Web App**:
 - Add to home screen prompt on mobile
 - Service Worker caches the delivery list for offline viewing
 - Background sync queues status updates when offline
-- Push notifications via Web Push API (device tokens stored in `device_sessions`)
+- Push notifications via Web Push API (tokens stored in `device_sessions`)
 
 Configure push notification keys in `.env`:
 
@@ -1180,17 +1343,11 @@ VAPID_PRIVATE_KEY=
 ### Option A — Docker (recommended)
 
 ```bash
-# Build the production image
 docker build -t veltrixo:latest .
-
-# Run with environment variables
-docker run -d \
-  --env-file .env.production \
-  -p 80:80 \
-  veltrixo:latest
+docker run -d --env-file .env.production -p 80:80 veltrixo:latest
 ```
 
-The `Dockerfile` is a multi-stage Alpine build that:
+The `Dockerfile` multi-stage build:
 1. Installs PHP 8.4-FPM with all required extensions
 2. Installs Composer dependencies (production-only)
 3. Builds frontend assets with Node.js
@@ -1200,34 +1357,28 @@ The `Dockerfile` is a multi-stage Alpine build that:
 ### Option B — Traditional VPS
 
 ```bash
-# Server: Ubuntu 24.04 LTS
 apt install php8.4-fpm php8.4-mysql php8.4-redis nginx mysql-client redis
 
 git clone https://github.com/mateen212/Veltrixo.git /var/www/Veltrixo
 cd /var/www/Veltrixo
 composer install --no-dev --optimize-autoloader
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+php artisan config:cache && php artisan route:cache && php artisan view:cache
 npm ci && npm run build
 ```
 
-**Nginx wildcard SSL (production):**
-
-For wildcard HTTPS you need a wildcard SSL certificate (e.g. from Let's Encrypt with DNS challenge):
+**Wildcard SSL:**
 
 ```bash
-certbot certonly --dns-cloudflare \
-  -d veltrixo.com \
-  -d "*.veltrixo.com"
+certbot certonly --dns-cloudflare -d veltrixo.com -d "*.veltrixo.com"
 ```
 
-### Post-deployment commands
+### Post-deployment
 
 ```bash
 php artisan migrate --force
 php artisan storage:link
-php artisan horizon:terminate  # graceful restart of workers
+chmod -R 775 /var/www/Veltrixo/storage /var/www/Veltrixo/bootstrap/cache
+php artisan horizon:terminate
 supervisorctl restart all
 ```
 
@@ -1237,10 +1388,11 @@ supervisorctl restart all
 
 - **Authentication**: Laravel Breeze (session-based) + Sanctum (API tokens)
 - **RBAC**: Spatie Permission — roles: `super_admin`, `admin`, `rider`, `customer`
-- **Subdomain isolation**: `InitializeTenancyBySubdomain` + `PreventCrossTenantAccess` prevent any cross-tenant data access at the HTTP layer
-- **Tenant row-level isolation**: `HasTenant` global scope on all data models — cross-tenant DB leakage impossible
-- **Central domain lock**: `OnlyCentralDomain` middleware prevents tenant users from accessing super admin routes
-- **Business verification**: New businesses start `pending_verification` — no active subdomain until explicitly approved by super admin
+- **Subdomain isolation**: `InitializeTenancyBySubdomain` + `PreventCrossTenantAccess` prevent cross-tenant data access at the HTTP layer
+- **Tenant row-level isolation**: `HasTenant` global scope on all data models
+- **Central domain lock**: `OnlyCentralDomain` middleware blocks tenant users from super admin routes
+- **Subdomain-scoped redirects**: Post-login redirects always supply the `{subdomain}` route parameter; users without a tenant (super admins) go to `super-admin.dashboard` instead
+- **Business verification**: New tenants start `pending_verification` — no active subdomain until explicitly approved
 - **CSRF protection**: Laravel's built-in CSRF middleware on all web routes
 - **XSS prevention**: Inertia.js escapes all rendered data; CSP headers via Nginx
 - **SQL injection**: Eloquent ORM with parameterised queries throughout
@@ -1255,10 +1407,9 @@ supervisorctl restart all
 
 ```bash
 # Run all tests (inside workspace container)
-cd /var/www/Veltrixo
 php artisan test
 
-# Run a specific test suite
+# Run a specific suite
 php artisan test --testsuite=Unit
 php artisan test --testsuite=Feature
 
@@ -1278,6 +1429,7 @@ Key test cases:
 - Subdomain resolution (correct tenant loaded from Host header)
 - Cross-tenant access prevention (tenant.user middleware)
 - Central domain lock (only.central middleware)
+- Post-login redirect includes correct `subdomain` parameter for all roles
 - Business signup → pending_verification state
 - Super admin approval → tenant active + subdomain live
 - Subscription creation → delivery generation
@@ -1324,6 +1476,8 @@ All responses use Laravel API Resources for consistent JSON structure.
 - **Lazy loading routes**: Vite code-splits per page automatically
 - **Queue workers**: All heavy operations (PDF, email, analytics) are async
 - **Tenant lookup**: `tenants.subdomain` has a unique index — O(1) lookup per request
+- **Font loading**: Google Fonts loaded with `display=swap` to prevent FOUT
+- **Animation performance**: GSAP and `@vueuse/motion` use `transform`/`opacity` only — no layout thrashing
 
 ---
 
@@ -1372,20 +1526,15 @@ Microservice candidates (when needed):
 ## End-to-End Testing Flow (JSON Graph)
 
 A complete walkthrough of **every actor, every route, and every automated side-effect** — starting from a completely empty database.  
-Copy the JSON into any graph visualiser (e.g. [jsoncrack.com](https://jsoncrack.com), Postman, or your own test harness) to explore the full flow.
+Copy the JSON into any graph visualiser (e.g. [jsoncrack.com](https://jsoncrack.com)) to explore the full flow.
 
-> **Legend**
-> - `id` — unique step identifier (prefix = actor: S=system, SA=super_admin, A=admin, R=rider, C=customer, SY=system-auto)
-> - `prerequisites` — step IDs that **must** be completed first
-> - `next` — step IDs that follow this one
-> - `edges` — explicit directed graph connections (from → to)
+> **Legend**: `id` prefix = actor (S=system, SA=super_admin, A=admin, R=rider, C=customer, SY=system-auto)
 
 ```json
 {
   "meta": {
     "name": "Veltrixo End-to-End Testing Flow",
     "version": "1.0.0",
-    "description": "Complete test graph starting from an empty database, covering every actor and every feature. Follow edges in order within each phase.",
     "base_url": "http://veltrixo.test",
     "roles": ["super_admin", "admin", "rider", "customer", "system"],
     "phases": {
@@ -1403,716 +1552,50 @@ Copy the JSON into any graph visualiser (e.g. [jsoncrack.com](https://jsoncrack.
     }
   },
   "nodes": [
-    {
-      "id": "S01",
-      "actor": "system",
-      "phase": "0_setup",
-      "step": 1,
-      "action": "Run all database migrations",
-      "command": "php artisan migrate",
-      "url": null,
-      "method": null,
-      "prerequisites": [],
-      "payload": null,
-      "expected_result": "All 36+ tables created in MySQL. No errors.",
-      "next": ["S02"]
-    },
-    {
-      "id": "S02",
-      "actor": "system",
-      "phase": "0_setup",
-      "step": 2,
-      "action": "Seed roles and permissions (super_admin, admin, rider, customer)",
-      "command": "php artisan db:seed --class=RolesAndPermissionsSeeder",
-      "url": null,
-      "method": null,
-      "prerequisites": ["S01"],
-      "payload": null,
-      "expected_result": "Roles created: super_admin, admin, manager, rider, customer, support. Permissions assigned.",
-      "next": ["S03"]
-    },
-    {
-      "id": "S03",
-      "actor": "system",
-      "phase": "0_setup",
-      "step": 3,
-      "action": "Seed super admin user",
-      "command": "php artisan db:seed --class=SuperAdminSeeder",
-      "url": null,
-      "method": null,
-      "prerequisites": ["S02"],
-      "payload": {
-        "name": "Super Admin",
-        "email": "superadmin@veltrixo.test",
-        "password": "password",
-        "role": "super_admin"
-      },
-      "expected_result": "User created and assigned super_admin role. No tenant_id set.",
-      "next": ["S04"]
-    },
-    {
-      "id": "S04",
-      "actor": "system",
-      "phase": "0_setup",
-      "step": 4,
-      "action": "Seed tenant plans (Starter, Business, Enterprise)",
-      "command": "php artisan db:seed --class=TenantPlansSeeder",
-      "url": null,
-      "method": null,
-      "prerequisites": ["S03"],
-      "payload": null,
-      "expected_result": "3 rows in tenant_plans: starter (PKR 0/mo), business (PKR 49.99/mo), enterprise (PKR 299/mo).",
-      "next": ["SA01"]
-    },
-    {
-      "id": "SA01",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 1,
-      "action": "Log in as Super Admin",
-      "url": "/login",
-      "method": "POST",
-      "prerequisites": ["S04"],
-      "payload": {
-        "email": "superadmin@veltrixo.test",
-        "password": "password"
-      },
-      "expected_result": "Redirected to /super-admin/dashboard. Role check: super_admin.",
-      "next": ["SA02"]
-    },
-    {
-      "id": "SA02",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 2,
-      "action": "View Super Admin Dashboard — see platform KPIs",
-      "url": "/super-admin/dashboard",
-      "method": "GET",
-      "route_name": "super-admin.dashboard",
-      "prerequisites": ["SA01"],
-      "payload": null,
-      "expected_result": "Dashboard renders: total_tenants=0, active_tenants=0, trial_tenants=0.",
-      "next": ["SA03"]
-    },
-    {
-      "id": "SA03",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 3,
-      "action": "Navigate to Plans — verify seeded plans are listed",
-      "url": "/super-admin/plans",
-      "method": "GET",
-      "route_name": "super-admin.plans.index",
-      "prerequisites": ["SA02"],
-      "payload": null,
-      "expected_result": "Table shows 3 plans: Starter, Business, Enterprise with correct PKR prices.",
-      "next": ["SA04"]
-    },
-    {
-      "id": "SA04",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 4,
-      "action": "Create a new custom plan via the Add Plan modal",
-      "url": "/super-admin/plans",
-      "method": "POST",
-      "route_name": "super-admin.plans.store",
-      "prerequisites": ["SA03"],
-      "payload": {
-        "name": "Pro",
-        "slug": "pro",
-        "description": "For medium businesses",
-        "price_monthly": 99.00,
-        "price_yearly": 990.00,
-        "max_customers": 2000,
-        "max_riders": 20,
-        "max_products": 500,
-        "max_orders_per_month": 20000,
-        "features": ["analytics", "api-access", "priority-support"],
-        "is_active": true,
-        "is_public": true,
-        "sort_order": 15
-      },
-      "expected_result": "New row in tenant_plans. Plans list now shows 4 plans.",
-      "next": ["SA05"]
-    },
-    {
-      "id": "SA05",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 5,
-      "action": "Navigate to Tenants — currently empty",
-      "url": "/super-admin/tenants",
-      "method": "GET",
-      "route_name": "super-admin.tenants.index",
-      "prerequisites": ["SA04"],
-      "payload": null,
-      "expected_result": "Tenants table is empty. 'No tenants yet' shown.",
-      "next": ["SA06"]
-    },
-    {
-      "id": "SA06",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 6,
-      "action": "Provision first tenant — fill Create Tenant form",
-      "url": "/super-admin/tenants",
-      "method": "POST",
-      "route_name": "super-admin.tenants.store",
-      "prerequisites": ["SA05"],
-      "payload": {
-        "business_name": "Al-Noor Dairy",
-        "owner_name": "Ahmed Ali",
-        "owner_email": "admin@alnoor-dairy.test",
-        "owner_phone": "03001234567",
-        "plan": "starter",
-        "trial_days": 30
-      },
-      "expected_result": "Tenant created. Admin user created (admin@alnoor-dairy.test). tenant_id linked. Subscription row created (status=trialing). Redirected to /super-admin/tenants/{id}.",
-      "next": ["SA07"]
-    },
-    {
-      "id": "SA07",
-      "actor": "super_admin",
-      "phase": "1_super_admin",
-      "step": 7,
-      "action": "View tenant detail — confirm owner, plan, trial expiry",
-      "url": "/super-admin/tenants/{tenant_id}",
-      "method": "GET",
-      "route_name": "super-admin.tenants.show",
-      "prerequisites": ["SA06"],
-      "payload": null,
-      "expected_result": "Shows: name=Al-Noor Dairy, owner=Ahmed Ali, plan=Starter, status=active, trial_ends=+30 days.",
-      "next": ["A01"]
-    },
-    {
-      "id": "A01",
-      "actor": "admin",
-      "phase": "2_admin_setup",
-      "step": 1,
-      "action": "Log in as tenant admin (user created during provisioning)",
-      "url": "/login",
-      "method": "POST",
-      "prerequisites": ["SA06"],
-      "payload": {
-        "email": "admin@alnoor-dairy.test",
-        "password": "password"
-      },
-      "note": "If password unknown, reset via: php artisan tinker → User::where('email','admin@alnoor-dairy.test')->first()->update(['password'=>bcrypt('password')])",
-      "expected_result": "Redirected to /admin/dashboard. Role=admin. All queries scoped to Al-Noor Dairy tenant_id.",
-      "next": ["A02"]
-    },
-    {
-      "id": "A02",
-      "actor": "admin",
-      "phase": "2_admin_setup",
-      "step": 2,
-      "action": "View Admin Dashboard — empty state",
-      "url": "/admin/dashboard",
-      "method": "GET",
-      "route_name": "admin.dashboard",
-      "prerequisites": ["A01"],
-      "payload": null,
-      "expected_result": "0 deliveries, 0 active subscriptions. No riders assigned yet.",
-      "next": ["A03"]
-    },
-    {
-      "id": "A03",
-      "actor": "admin",
-      "phase": "2_admin_setup",
-      "step": 3,
-      "action": "Create first product: Full Cream Milk 1L",
-      "url": "/admin/products",
-      "method": "POST",
-      "route_name": "admin.products.store",
-      "prerequisites": ["A02"],
-      "payload": {
-        "name": "Full Cream Milk 1L",
-        "description": "Fresh farm milk",
-        "price": 180,
-        "unit": "litre",
-        "sku": "MILK-1L",
-        "is_active": true
-      },
-      "expected_result": "products row created with tenant_id. SKU MILK-1L visible in product list.",
-      "next": ["A04"]
-    },
-    {
-      "id": "A04",
-      "actor": "admin",
-      "phase": "2_admin_setup",
-      "step": 4,
-      "action": "Create second product: Yoghurt 500g",
-      "url": "/admin/products",
-      "method": "POST",
-      "route_name": "admin.products.store",
-      "prerequisites": ["A03"],
-      "payload": {
-        "name": "Yoghurt 500g",
-        "description": "Creamy plain yoghurt",
-        "price": 120,
-        "unit": "kg",
-        "sku": "YOG-500G",
-        "is_active": true
-      },
-      "expected_result": "Second product created. Products list shows 2 items.",
-      "next": ["A05"]
-    },
-    {
-      "id": "A05",
-      "actor": "admin",
-      "phase": "2_admin_setup",
-      "step": 5,
-      "action": "Create rider account",
-      "url": "/admin/riders",
-      "method": "POST",
-      "route_name": "admin.riders.store",
-      "prerequisites": ["A04"],
-      "payload": {
-        "name": "Usman Rider",
-        "email": "rider@alnoor-dairy.test",
-        "phone": "03111234567",
-        "vehicle_type": "motorcycle",
-        "vehicle_number": "LEA-1234"
-      },
-      "expected_result": "Rider record and User created with role=rider, tenant_id scoped. Rider visible in riders list.",
-      "next": ["C01"]
-    },
-    {
-      "id": "C01",
-      "actor": "customer",
-      "phase": "3_customer_onboard",
-      "step": 1,
-      "action": "Register as customer (self-service or admin-created)",
-      "url": "/register",
-      "method": "POST",
-      "prerequisites": ["SA06"],
-      "payload": {
-        "name": "Sara Customer",
-        "email": "sara@example.test",
-        "phone": "03009876543",
-        "password": "password",
-        "password_confirmation": "password"
-      },
-      "expected_result": "User created with role=customer, tenant_id scoped. Wallet auto-created (balance=Rs 0.00). Redirected to /customer/dashboard.",
-      "next": ["C02"]
-    },
-    {
-      "id": "C02",
-      "actor": "customer",
-      "phase": "3_customer_onboard",
-      "step": 2,
-      "action": "View customer dashboard — wallet balance Rs 0",
-      "url": "/customer/dashboard",
-      "method": "GET",
-      "route_name": "customer.dashboard",
-      "prerequisites": ["C01"],
-      "payload": null,
-      "expected_result": "Dashboard: wallet=Rs 0.00, 0 active subscriptions. Prompt to top up wallet visible.",
-      "next": ["C03"]
-    },
-    {
-      "id": "C03",
-      "actor": "customer",
-      "phase": "3_customer_onboard",
-      "step": 3,
-      "action": "Submit wallet recharge request (Rs 2000 via JazzCash)",
-      "url": "/customer/wallet/recharge",
-      "method": "POST",
-      "route_name": "customer.wallet.recharge",
-      "prerequisites": ["C02"],
-      "payload": {
-        "amount": 2000,
-        "payment_method": "jazzcash",
-        "reference": "JZ-20260526-88374",
-        "notes": "Recharge via JazzCash mobile app"
-      },
-      "expected_result": "wallet_recharge_requests row created (status=pending). Admin notified via WebSocket. Customer sees 'Pending approval'.",
-      "next": ["C04", "A06"]
-    },
-    {
-      "id": "C04",
-      "actor": "customer",
-      "phase": "3_customer_onboard",
-      "step": 4,
-      "action": "View wallet page — pending recharge shown",
-      "url": "/customer/wallet",
-      "method": "GET",
-      "route_name": "customer.wallet",
-      "prerequisites": ["C03"],
-      "payload": null,
-      "expected_result": "Balance: Rs 0.00. Recharge requests list: 1 pending (Rs 2000, JazzCash, ref JZ-20260526-88374).",
-      "next": ["A06"]
-    },
-    {
-      "id": "A06",
-      "actor": "admin",
-      "phase": "4_wallet_approval",
-      "step": 1,
-      "action": "View wallet recharge requests — verify JazzCash reference",
-      "url": "/admin/wallets",
-      "method": "GET",
-      "route_name": "admin.wallets.index",
-      "prerequisites": ["C03"],
-      "payload": null,
-      "expected_result": "Pending recharges list shows Sara's Rs 2000 JazzCash request with reference JZ-20260526-88374.",
-      "next": ["A07"]
-    },
-    {
-      "id": "A07",
-      "actor": "admin",
-      "phase": "4_wallet_approval",
-      "step": 2,
-      "action": "Approve wallet recharge",
-      "url": "/admin/wallets/recharges/{recharge_id}/approve",
-      "method": "PATCH",
-      "route_name": "admin.wallets.recharges.approve",
-      "prerequisites": ["A06"],
-      "payload": null,
-      "expected_result": "recharge.status → approved. wallet.balance: Rs 0 → Rs 2000. WalletTransaction credit created. Sara notified.",
-      "next": ["C05"]
-    },
-    {
-      "id": "C05",
-      "actor": "customer",
-      "phase": "3_customer_onboard",
-      "step": 5,
-      "action": "Wallet approved — create first subscription",
-      "url": "/customer/subscriptions",
-      "method": "POST",
-      "route_name": "customer.subscriptions.store",
-      "prerequisites": ["A07", "A04"],
-      "payload": {
-        "frequency": "daily",
-        "items": [
-          { "product_id": 1, "quantity": 2 },
-          { "product_id": 2, "quantity": 1 }
-        ],
-        "address": {
-          "line1": "House 12, Street 5",
-          "city": "Lahore",
-          "area": "DHA Phase 4"
-        },
-        "starts_at": "2026-05-27"
-      },
-      "expected_result": "Subscription created (status=active, frequency=daily). subscription_items: 2×Milk + 1×Yoghurt. Daily cost: Rs 480 (2×180 + 120).",
-      "next": ["C06"]
-    },
-    {
-      "id": "C06",
-      "actor": "customer",
-      "phase": "3_customer_onboard",
-      "step": 6,
-      "action": "View subscriptions list",
-      "url": "/customer/subscriptions",
-      "method": "GET",
-      "route_name": "customer.subscriptions.index",
-      "prerequisites": ["C05"],
-      "payload": null,
-      "expected_result": "1 active subscription: daily, Rs 480/delivery, next delivery: 2026-05-27.",
-      "next": ["A08"]
-    },
-    {
-      "id": "A08",
-      "actor": "admin",
-      "phase": "5_delivery_ops",
-      "step": 1,
-      "action": "Generate deliveries for tomorrow via admin panel",
-      "url": "/admin/deliveries/generate",
-      "method": "POST",
-      "route_name": "admin.deliveries.generate",
-      "prerequisites": ["C05"],
-      "payload": {
-        "date": "2026-05-27"
-      },
-      "expected_result": "1 delivery created: Sara's subscription, 2026-05-27. delivery_items: 2×MILK-1L + 1×YOG-500G. status=pending.",
-      "next": ["A09"]
-    },
-    {
-      "id": "A09",
-      "actor": "admin",
-      "phase": "5_delivery_ops",
-      "step": 2,
-      "action": "View deliveries list — filter pending",
-      "url": "/admin/deliveries",
-      "method": "GET",
-      "route_name": "admin.deliveries.index",
-      "prerequisites": ["A08"],
-      "payload": null,
-      "expected_result": "1 delivery: Sara Customer, DHA Phase 4, status=pending.",
-      "next": ["A10"]
-    },
-    {
-      "id": "A10",
-      "actor": "admin",
-      "phase": "5_delivery_ops",
-      "step": 3,
-      "action": "Bulk-assign delivery to Usman Rider",
-      "url": "/admin/deliveries/bulk-assign",
-      "method": "POST",
-      "route_name": "admin.deliveries.bulk-assign",
-      "prerequisites": ["A09", "A05"],
-      "payload": {
-        "delivery_ids": [1],
-        "rider_id": 1
-      },
-      "expected_result": "delivery.status → assigned, rider_id set. Rider gets WebSocket push 'New deliveries assigned'. Admin sees 0 pending, 1 assigned.",
-      "next": ["R01"]
-    },
-    {
-      "id": "R01",
-      "actor": "rider",
-      "phase": "6_rider_ops",
-      "step": 1,
-      "action": "Log in as rider",
-      "url": "/login",
-      "method": "POST",
-      "prerequisites": ["A05"],
-      "payload": {
-        "email": "rider@alnoor-dairy.test",
-        "password": "password"
-      },
-      "expected_result": "Redirected to /rider/dashboard. Role=rider. Tenant scoped.",
-      "next": ["R02"]
-    },
-    {
-      "id": "R02",
-      "actor": "rider",
-      "phase": "6_rider_ops",
-      "step": 2,
-      "action": "View rider dashboard — 1 assigned delivery today",
-      "url": "/rider/dashboard",
-      "method": "GET",
-      "route_name": "rider.dashboard",
-      "prerequisites": ["R01", "A10"],
-      "payload": null,
-      "expected_result": "assigned=1, completed=0, remaining=1.",
-      "next": ["R03"]
-    },
-    {
-      "id": "R03",
-      "actor": "rider",
-      "phase": "6_rider_ops",
-      "step": 3,
-      "action": "View deliveries list — Sara's delivery card",
-      "url": "/rider/deliveries",
-      "method": "GET",
-      "route_name": "rider.deliveries.index",
-      "prerequisites": ["R02"],
-      "payload": null,
-      "expected_result": "1 delivery card: Sara Customer, DHA Phase 4, 2×Milk + 1×Yoghurt. Status=assigned. 'Start Delivery' button visible.",
-      "next": ["R04"]
-    },
-    {
-      "id": "R04",
-      "actor": "rider",
-      "phase": "6_rider_ops",
-      "step": 4,
-      "action": "Start delivery — tap Start",
-      "url": "/rider/deliveries/{delivery_id}/start",
-      "method": "POST",
-      "route_name": "rider.deliveries.start",
-      "prerequisites": ["R03"],
-      "payload": {
-        "latitude": 31.5204,
-        "longitude": 74.3587
-      },
-      "expected_result": "delivery.status → in_progress. GPS + timestamp recorded. Admin dashboard updates in real-time via DeliveryStatusUpdated event.",
-      "next": ["R05"]
-    },
-    {
-      "id": "R05",
-      "actor": "rider",
-      "phase": "6_rider_ops",
-      "step": 5,
-      "action": "Complete delivery — tap Complete after handing items to customer",
-      "url": "/rider/deliveries/{delivery_id}/complete",
-      "method": "POST",
-      "route_name": "rider.deliveries.complete",
-      "prerequisites": ["R04"],
-      "payload": {
-        "latitude": 31.5201,
-        "longitude": 74.3590,
-        "notes": "Delivered to guard at gate"
-      },
-      "expected_result": "delivery.status → delivered. DeliveryObserver fires: wallet deducted, invoice queued, receipt notification queued.",
-      "next": ["SY01"]
-    },
-    {
-      "id": "SY01",
-      "actor": "system",
-      "phase": "7_post_delivery",
-      "step": 1,
-      "action": "WalletService deducts Rs 480 from Sara's wallet (DeliveryObserver)",
-      "command": "Automatic — DeliveryObserver on delivery.status=delivered",
-      "url": null,
-      "method": null,
-      "prerequisites": ["R05"],
-      "payload": null,
-      "expected_result": "wallets.balance: Rs 2000 → Rs 1520. wallet_transactions: debit Rs 480, reference=delivery_{id}.",
-      "next": ["SY02"]
-    },
-    {
-      "id": "SY02",
-      "actor": "system",
-      "phase": "7_post_delivery",
-      "step": 2,
-      "action": "GenerateInvoiceJob creates PDF invoice (invoices queue)",
-      "command": "Dispatched by WalletDebited listener",
-      "url": null,
-      "method": null,
-      "prerequisites": ["SY01"],
-      "payload": null,
-      "expected_result": "Invoice + invoice_items rows created. PDF stored in storage/S3.",
-      "next": ["SY03"]
-    },
-    {
-      "id": "SY03",
-      "actor": "system",
-      "phase": "7_post_delivery",
-      "step": 3,
-      "action": "SendDeliveryReceiptNotification dispatched to Sara (notifications queue)",
-      "command": "Dispatched by GenerateInvoiceJob on completion",
-      "url": null,
-      "method": null,
-      "prerequisites": ["SY02"],
-      "payload": null,
-      "expected_result": "Sara's notification bell increments. In-app: 'Delivered! Rs 480 deducted. Balance: Rs 1520.' Mail receipt sent.",
-      "next": ["C07"]
-    },
-    {
-      "id": "C07",
-      "actor": "customer",
-      "phase": "8_customer_self_service",
-      "step": 1,
-      "action": "View delivery history — completed delivery with invoice link",
-      "url": "/customer/deliveries",
-      "method": "GET",
-      "route_name": "customer.deliveries.index",
-      "prerequisites": ["SY03"],
-      "payload": null,
-      "expected_result": "1 delivery: status=delivered, 2026-05-27, Rs 480. Invoice PDF download link present.",
-      "next": ["C08"]
-    },
-    {
-      "id": "C08",
-      "actor": "customer",
-      "phase": "8_customer_self_service",
-      "step": 2,
-      "action": "View delivery detail and download PDF invoice",
-      "url": "/customer/deliveries/{delivery_id}",
-      "method": "GET",
-      "route_name": "customer.deliveries.show",
-      "prerequisites": ["C07"],
-      "payload": null,
-      "expected_result": "Detail page: items, GPS timestamps, amount=Rs 480. PDF download functional.",
-      "next": ["C09"]
-    },
-    {
-      "id": "C09",
-      "actor": "customer",
-      "phase": "8_customer_self_service",
-      "step": 3,
-      "action": "Skip next delivery",
-      "url": "/customer/subscriptions/{subscription_id}/skip",
-      "method": "POST",
-      "route_name": "customer.subscriptions.skip",
-      "prerequisites": ["C06"],
-      "payload": {
-        "skip_date": "2026-05-28"
-      },
-      "expected_result": "subscription_skips row created for 2026-05-28. GenerateDeliveriesJob will skip this date.",
-      "next": ["C10"]
-    },
-    {
-      "id": "C10",
-      "actor": "customer",
-      "phase": "8_customer_self_service",
-      "step": 4,
-      "action": "Pause subscription for vacation",
-      "url": "/customer/subscriptions/{subscription_id}/pause",
-      "method": "POST",
-      "route_name": "customer.subscriptions.pause",
-      "prerequisites": ["C09"],
-      "payload": {
-        "pause_from": "2026-05-29",
-        "pause_until": "2026-06-03"
-      },
-      "expected_result": "subscription.status → paused. No deliveries generated between those dates.",
-      "next": ["C11"]
-    },
-    {
-      "id": "C11",
-      "actor": "customer",
-      "phase": "8_customer_self_service",
-      "step": 5,
-      "action": "Resume subscription early",
-      "url": "/customer/subscriptions/{subscription_id}/resume",
-      "method": "POST",
-      "route_name": "customer.subscriptions.resume",
-      "prerequisites": ["C10"],
-      "payload": null,
-      "expected_result": "subscription.status → active. Deliveries resume from next valid date.",
-      "next": ["A11"]
-    },
-    {
-      "id": "A11",
-      "actor": "admin",
-      "phase": "9_admin_analytics",
-      "step": 1,
-      "action": "View Admin Analytics dashboard",
-      "url": "/admin/analytics",
-      "method": "GET",
-      "route_name": "admin.analytics",
-      "prerequisites": ["R05"],
-      "payload": null,
-      "expected_result": "KPIs: deliveries_today=1, completed=1, revenue_today=Rs 480, active_subscriptions=1, wallet_total=Rs 1520.",
-      "next": ["SA08"]
-    },
-    {
-      "id": "SA08",
-      "actor": "super_admin",
-      "phase": "10_super_admin_monitor",
-      "step": 1,
-      "action": "Super Admin revisits Tenants list — Al-Noor Dairy active",
-      "url": "/super-admin/tenants",
-      "method": "GET",
-      "route_name": "super-admin.tenants.index",
-      "prerequisites": ["A11"],
-      "payload": null,
-      "expected_result": "1 tenant listed: Al-Noor Dairy, status=active, plan=Starter, owner=Ahmed Ali.",
-      "next": ["SA09"]
-    },
-    {
-      "id": "SA09",
-      "actor": "super_admin",
-      "phase": "10_super_admin_monitor",
-      "step": 2,
-      "action": "Suspend tenant (testing suspension flow)",
-      "url": "/super-admin/tenants/{tenant_id}/suspend",
-      "method": "PATCH",
-      "route_name": "super-admin.tenants.suspend",
-      "prerequisites": ["SA08"],
-      "payload": {
-        "reason": "Testing suspension flow"
-      },
-      "expected_result": "tenant.status → suspended. Admin/rider/customer logins for this tenant blocked.",
-      "next": ["SA10"]
-    },
-    {
-      "id": "SA10",
-      "actor": "super_admin",
-      "phase": "10_super_admin_monitor",
-      "step": 3,
-      "action": "Reactivate tenant",
-      "url": "/super-admin/tenants/{tenant_id}/reactivate",
-      "method": "PATCH",
-      "route_name": "super-admin.tenants.reactivate",
-      "prerequisites": ["SA09"],
-      "payload": null,
-      "expected_result": "tenant.status → active. All users for this tenant can log in again normally.",
-      "next": []
-    }
+    { "id": "S01", "actor": "system", "phase": "0_setup", "step": 1, "action": "Run all database migrations", "command": "php artisan migrate", "prerequisites": [], "expected_result": "All 36+ tables created in MySQL.", "next": ["S02"] },
+    { "id": "S02", "actor": "system", "phase": "0_setup", "step": 2, "action": "Seed roles and permissions", "command": "php artisan db:seed --class=RolesAndPermissionsSeeder", "prerequisites": ["S01"], "expected_result": "Roles created: super_admin, admin, manager, rider, customer, support.", "next": ["S03"] },
+    { "id": "S03", "actor": "system", "phase": "0_setup", "step": 3, "action": "Seed super admin user", "command": "php artisan db:seed --class=SuperAdminSeeder", "prerequisites": ["S02"], "payload": { "email": "superadmin@veltrixo.test", "password": "password", "role": "super_admin" }, "expected_result": "User created, super_admin role assigned, no tenant_id.", "next": ["S04"] },
+    { "id": "S04", "actor": "system", "phase": "0_setup", "step": 4, "action": "Seed tenant plans (Starter, Business, Enterprise)", "command": "php artisan db:seed --class=TenantPlansSeeder", "prerequisites": ["S03"], "expected_result": "3 rows in tenant_plans.", "next": ["SA01"] },
+    { "id": "SA01", "actor": "super_admin", "phase": "1_super_admin", "step": 1, "action": "Log in as Super Admin", "url": "/login", "method": "POST", "prerequisites": ["S04"], "payload": { "email": "superadmin@veltrixo.test", "password": "password" }, "expected_result": "Redirected to /super-admin/dashboard.", "next": ["SA02"] },
+    { "id": "SA02", "actor": "super_admin", "phase": "1_super_admin", "step": 2, "action": "View Super Admin Dashboard", "url": "/super-admin/dashboard", "method": "GET", "route_name": "super-admin.dashboard", "prerequisites": ["SA01"], "expected_result": "total_tenants=0, active_tenants=0.", "next": ["SA03"] },
+    { "id": "SA03", "actor": "super_admin", "phase": "1_super_admin", "step": 3, "action": "View Plans list", "url": "/super-admin/plans", "method": "GET", "route_name": "super-admin.plans.index", "prerequisites": ["SA02"], "expected_result": "3 plans listed.", "next": ["SA04"] },
+    { "id": "SA04", "actor": "super_admin", "phase": "1_super_admin", "step": 4, "action": "Create custom plan", "url": "/super-admin/plans", "method": "POST", "route_name": "super-admin.plans.store", "prerequisites": ["SA03"], "payload": { "name": "Pro", "slug": "pro", "price_monthly": 99.00, "max_customers": 2000, "max_riders": 20 }, "expected_result": "4 plans in list.", "next": ["SA05"] },
+    { "id": "SA05", "actor": "super_admin", "phase": "1_super_admin", "step": 5, "action": "View Tenants — empty", "url": "/super-admin/tenants", "method": "GET", "route_name": "super-admin.tenants.index", "prerequisites": ["SA04"], "expected_result": "Empty state shown.", "next": ["SA06"] },
+    { "id": "SA06", "actor": "super_admin", "phase": "1_super_admin", "step": 6, "action": "Provision first tenant", "url": "/super-admin/tenants", "method": "POST", "route_name": "super-admin.tenants.store", "prerequisites": ["SA05"], "payload": { "business_name": "Al-Noor Dairy", "owner_email": "admin@alnoor-dairy.test", "plan": "starter", "trial_days": 30 }, "expected_result": "Tenant + admin user created. Redirected to detail page.", "next": ["SA07"] },
+    { "id": "SA07", "actor": "super_admin", "phase": "1_super_admin", "step": 7, "action": "View tenant detail", "url": "/super-admin/tenants/{tenant_id}", "method": "GET", "route_name": "super-admin.tenants.show", "prerequisites": ["SA06"], "expected_result": "Al-Noor Dairy, plan=Starter, status=active, trial_ends=+30 days.", "next": ["A01"] },
+    { "id": "A01", "actor": "admin", "phase": "2_admin_setup", "step": 1, "action": "Log in as tenant admin at subdomain", "url": "http://alnoor-dairy.veltrixo.test/login", "method": "POST", "prerequisites": ["SA06"], "payload": { "email": "admin@alnoor-dairy.test", "password": "password" }, "note": "AuthenticatedSessionController redirects to route('admin.dashboard', ['subdomain' => 'alnoor-dairy']).", "expected_result": "Redirected to /admin/dashboard. Tenant scoped.", "next": ["A02"] },
+    { "id": "A02", "actor": "admin", "phase": "2_admin_setup", "step": 2, "action": "View Admin Dashboard", "url": "/admin/dashboard", "method": "GET", "route_name": "admin.dashboard", "prerequisites": ["A01"], "expected_result": "0 deliveries, 0 subscriptions.", "next": ["A03"] },
+    { "id": "A03", "actor": "admin", "phase": "2_admin_setup", "step": 3, "action": "Create product: Full Cream Milk 1L", "url": "/admin/products", "method": "POST", "route_name": "admin.products.store", "prerequisites": ["A02"], "payload": { "name": "Full Cream Milk 1L", "price": 180, "sku": "MILK-1L", "is_active": true }, "expected_result": "Product created with tenant_id.", "next": ["A04"] },
+    { "id": "A04", "actor": "admin", "phase": "2_admin_setup", "step": 4, "action": "Create product: Yoghurt 500g", "url": "/admin/products", "method": "POST", "route_name": "admin.products.store", "prerequisites": ["A03"], "payload": { "name": "Yoghurt 500g", "price": 120, "sku": "YOG-500G", "is_active": true }, "expected_result": "Products list: 2 items.", "next": ["A05"] },
+    { "id": "A05", "actor": "admin", "phase": "2_admin_setup", "step": 5, "action": "Create rider account", "url": "/admin/riders", "method": "POST", "route_name": "admin.riders.store", "prerequisites": ["A04"], "payload": { "name": "Usman Rider", "email": "rider@alnoor-dairy.test", "phone": "03111234567", "vehicle_type": "motorcycle" }, "expected_result": "Rider + User created with role=rider, tenant_id scoped.", "next": ["C01"] },
+    { "id": "C01", "actor": "customer", "phase": "3_customer_onboard", "step": 1, "action": "Register as customer", "url": "/register", "method": "POST", "prerequisites": ["SA06"], "payload": { "name": "Sara Customer", "email": "sara@example.test", "password": "password" }, "expected_result": "User created, role=customer, wallet auto-created (Rs 0). Redirected to /customer/dashboard.", "next": ["C02"] },
+    { "id": "C02", "actor": "customer", "phase": "3_customer_onboard", "step": 2, "action": "View customer dashboard", "url": "/customer/dashboard", "method": "GET", "route_name": "customer.dashboard", "prerequisites": ["C01"], "expected_result": "wallet=Rs 0, 0 subscriptions.", "next": ["C03"] },
+    { "id": "C03", "actor": "customer", "phase": "3_customer_onboard", "step": 3, "action": "Submit wallet recharge request (Rs 2000 via JazzCash)", "url": "/customer/wallet/recharge", "method": "POST", "route_name": "customer.wallet.recharge", "prerequisites": ["C02"], "payload": { "amount": 2000, "payment_method": "jazzcash", "reference": "JZ-20260526-88374" }, "expected_result": "Recharge request created (status=pending). Admin notified via WebSocket.", "next": ["C04", "A06"] },
+    { "id": "C04", "actor": "customer", "phase": "3_customer_onboard", "step": 4, "action": "View wallet — pending recharge", "url": "/customer/wallet", "method": "GET", "route_name": "customer.wallet", "prerequisites": ["C03"], "expected_result": "Balance Rs 0, 1 pending recharge.", "next": ["A06"] },
+    { "id": "A06", "actor": "admin", "phase": "4_wallet_approval", "step": 1, "action": "View wallet recharge requests", "url": "/admin/wallets", "method": "GET", "route_name": "admin.wallets.index", "prerequisites": ["C03"], "expected_result": "Sara's Rs 2000 JazzCash request listed.", "next": ["A07"] },
+    { "id": "A07", "actor": "admin", "phase": "4_wallet_approval", "step": 2, "action": "Approve wallet recharge", "url": "/admin/wallets/recharges/{recharge_id}/approve", "method": "PATCH", "route_name": "admin.wallets.recharges.approve", "prerequisites": ["A06"], "expected_result": "wallet.balance: Rs 0 → Rs 2000. WalletTransaction credit created. Sara notified.", "next": ["C05"] },
+    { "id": "C05", "actor": "customer", "phase": "3_customer_onboard", "step": 5, "action": "Create first subscription", "url": "/customer/subscriptions", "method": "POST", "route_name": "customer.subscriptions.store", "prerequisites": ["A07", "A04"], "payload": { "frequency": "daily", "items": [{ "product_id": 1, "quantity": 2 }, { "product_id": 2, "quantity": 1 }], "starts_at": "2026-05-27" }, "expected_result": "Subscription active. Daily cost: Rs 480.", "next": ["C06"] },
+    { "id": "C06", "actor": "customer", "phase": "3_customer_onboard", "step": 6, "action": "View subscriptions list", "url": "/customer/subscriptions", "method": "GET", "route_name": "customer.subscriptions.index", "prerequisites": ["C05"], "expected_result": "1 active subscription, Rs 480/delivery.", "next": ["A08"] },
+    { "id": "A08", "actor": "admin", "phase": "5_delivery_ops", "step": 1, "action": "Generate deliveries for 2026-05-27", "url": "/admin/deliveries/generate", "method": "POST", "route_name": "admin.deliveries.generate", "prerequisites": ["C05"], "payload": { "date": "2026-05-27" }, "expected_result": "1 delivery created (status=pending).", "next": ["A09"] },
+    { "id": "A09", "actor": "admin", "phase": "5_delivery_ops", "step": 2, "action": "View deliveries list", "url": "/admin/deliveries", "method": "GET", "route_name": "admin.deliveries.index", "prerequisites": ["A08"], "expected_result": "1 pending delivery: Sara Customer.", "next": ["A10"] },
+    { "id": "A10", "actor": "admin", "phase": "5_delivery_ops", "step": 3, "action": "Bulk-assign to Usman Rider", "url": "/admin/deliveries/bulk-assign", "method": "POST", "route_name": "admin.deliveries.bulk-assign", "prerequisites": ["A09", "A05"], "payload": { "delivery_ids": [1], "rider_id": 1 }, "expected_result": "delivery.status → assigned. Rider gets WebSocket push.", "next": ["R01"] },
+    { "id": "R01", "actor": "rider", "phase": "6_rider_ops", "step": 1, "action": "Log in as rider at tenant subdomain", "url": "http://alnoor-dairy.veltrixo.test/login", "method": "POST", "prerequisites": ["A05"], "payload": { "email": "rider@alnoor-dairy.test", "password": "password" }, "expected_result": "Redirected to /rider/dashboard via route('rider.dashboard', ['subdomain' => 'alnoor-dairy']).", "next": ["R02"] },
+    { "id": "R02", "actor": "rider", "phase": "6_rider_ops", "step": 2, "action": "View rider dashboard", "url": "/rider/dashboard", "method": "GET", "route_name": "rider.dashboard", "prerequisites": ["R01", "A10"], "expected_result": "assigned=1, completed=0.", "next": ["R03"] },
+    { "id": "R03", "actor": "rider", "phase": "6_rider_ops", "step": 3, "action": "View deliveries list", "url": "/rider/deliveries", "method": "GET", "route_name": "rider.deliveries.index", "prerequisites": ["R02"], "expected_result": "1 delivery card: Sara Customer, status=assigned.", "next": ["R04"] },
+    { "id": "R04", "actor": "rider", "phase": "6_rider_ops", "step": 4, "action": "Start delivery", "url": "/rider/deliveries/{delivery_id}/start", "method": "POST", "route_name": "rider.deliveries.start", "prerequisites": ["R03"], "payload": { "latitude": 31.5204, "longitude": 74.3587 }, "expected_result": "delivery.status → in_progress. Real-time update to admin.", "next": ["R05"] },
+    { "id": "R05", "actor": "rider", "phase": "6_rider_ops", "step": 5, "action": "Complete delivery", "url": "/rider/deliveries/{delivery_id}/complete", "method": "POST", "route_name": "rider.deliveries.complete", "prerequisites": ["R04"], "payload": { "latitude": 31.5201, "longitude": 74.3590, "notes": "Delivered to guard at gate" }, "expected_result": "delivery.status → delivered. DeliveryObserver fires.", "next": ["SY01"] },
+    { "id": "SY01", "actor": "system", "phase": "7_post_delivery", "step": 1, "action": "WalletService deducts Rs 480 (DeliveryObserver)", "prerequisites": ["R05"], "expected_result": "wallets.balance: Rs 2000 → Rs 1520. WalletTransaction debit created.", "next": ["SY02"] },
+    { "id": "SY02", "actor": "system", "phase": "7_post_delivery", "step": 2, "action": "GenerateInvoiceJob creates PDF (invoices queue)", "prerequisites": ["SY01"], "expected_result": "Invoice + invoice_items rows. PDF stored in storage/S3.", "next": ["SY03"] },
+    { "id": "SY03", "actor": "system", "phase": "7_post_delivery", "step": 3, "action": "SendDeliveryReceiptNotification to Sara (notifications queue)", "prerequisites": ["SY02"], "expected_result": "In-app + mail: 'Delivered! Rs 480 deducted. Balance: Rs 1520.'", "next": ["C07"] },
+    { "id": "C07", "actor": "customer", "phase": "8_customer_self_service", "step": 1, "action": "View delivery history", "url": "/customer/deliveries", "method": "GET", "route_name": "customer.deliveries.index", "prerequisites": ["SY03"], "expected_result": "1 delivered entry, invoice download link.", "next": ["C08"] },
+    { "id": "C08", "actor": "customer", "phase": "8_customer_self_service", "step": 2, "action": "View delivery detail + download PDF invoice", "url": "/customer/deliveries/{delivery_id}", "method": "GET", "route_name": "customer.deliveries.show", "prerequisites": ["C07"], "expected_result": "Detail: items, GPS timestamps, Rs 480. PDF download works.", "next": ["C09"] },
+    { "id": "C09", "actor": "customer", "phase": "8_customer_self_service", "step": 3, "action": "Skip next delivery (2026-05-28)", "url": "/customer/subscriptions/{subscription_id}/skip", "method": "POST", "route_name": "customer.subscriptions.skip", "prerequisites": ["C06"], "payload": { "skip_date": "2026-05-28" }, "expected_result": "subscription_skips row created.", "next": ["C10"] },
+    { "id": "C10", "actor": "customer", "phase": "8_customer_self_service", "step": 4, "action": "Pause subscription", "url": "/customer/subscriptions/{subscription_id}/pause", "method": "POST", "route_name": "customer.subscriptions.pause", "prerequisites": ["C09"], "payload": { "pause_from": "2026-05-29", "pause_until": "2026-06-03" }, "expected_result": "subscription.status → paused.", "next": ["C11"] },
+    { "id": "C11", "actor": "customer", "phase": "8_customer_self_service", "step": 5, "action": "Resume subscription early", "url": "/customer/subscriptions/{subscription_id}/resume", "method": "POST", "route_name": "customer.subscriptions.resume", "prerequisites": ["C10"], "expected_result": "subscription.status → active.", "next": ["A11"] },
+    { "id": "A11", "actor": "admin", "phase": "9_admin_analytics", "step": 1, "action": "View Analytics dashboard", "url": "/admin/analytics", "method": "GET", "route_name": "admin.analytics", "prerequisites": ["R05"], "expected_result": "deliveries_today=1, completed=1, revenue_today=Rs 480.", "next": ["SA08"] },
+    { "id": "SA08", "actor": "super_admin", "phase": "10_super_admin_monitor", "step": 1, "action": "View Tenants list", "url": "/super-admin/tenants", "method": "GET", "route_name": "super-admin.tenants.index", "prerequisites": ["A11"], "expected_result": "Al-Noor Dairy, status=active.", "next": ["SA09"] },
+    { "id": "SA09", "actor": "super_admin", "phase": "10_super_admin_monitor", "step": 2, "action": "Suspend tenant", "url": "/super-admin/tenants/{tenant_id}/suspend", "method": "PATCH", "route_name": "super-admin.tenants.suspend", "prerequisites": ["SA08"], "payload": { "reason": "Testing suspension flow" }, "expected_result": "tenant.status → suspended. All logins for this tenant blocked.", "next": ["SA10"] },
+    { "id": "SA10", "actor": "super_admin", "phase": "10_super_admin_monitor", "step": 3, "action": "Reactivate tenant", "url": "/super-admin/tenants/{tenant_id}/reactivate", "method": "PATCH", "route_name": "super-admin.tenants.reactivate", "prerequisites": ["SA09"], "expected_result": "tenant.status → active. All users can log in again.", "next": [] }
   ],
   "edges": [
     { "from": "S01",  "to": "S02",  "label": "migrate done" },
@@ -2175,8 +1658,7 @@ We welcome contributions. Please read the guidelines before submitting a PR.
 
 ```bash
 # 1. Fork the repository
-
-# 2. Start your feature branch
+# 2. Create your feature branch
 git checkout -b feature/your-feature-name
 
 # 3. Make changes and write tests
@@ -2193,9 +1675,11 @@ npm run build
 ### Code style
 
 - PHP: PSR-12 (enforced via Pint)
-- TypeScript: strict mode enabled
-- Vue: Composition API + `<script setup>` only
-- Commits: Conventional Commits format (`feat:`, `fix:`, `docs:`, etc.)
+- TypeScript: strict mode enabled (`tsconfig.json`)
+- Vue: Composition API + `<script setup lang="ts">` only
+- Tailwind: use design token classes (`border-border`, `bg-surface`, `text-ink`) — never raw hex in class attributes
+- Tailwind v3 important: `DEFAULT` key → no suffix (e.g. `border-border`, not `border-border-DEFAULT`)
+- Commits: Conventional Commits (`feat:`, `fix:`, `docs:`, `style:`, etc.)
 
 ```bash
 # Auto-fix PHP code style

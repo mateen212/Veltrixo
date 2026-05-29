@@ -32,14 +32,15 @@ const safeLinks = computed(() => {
 })
 </script>
 <template>
-    <div v-if="meta" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-gray-100 bg-white">
-        <p class="text-sm text-gray-500 order-2 sm:order-1">
+    <div v-if="meta && meta.total > 0"
+        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3.5 border-t border-border-muted bg-surface-muted/40">
+        <p class="text-xs text-ink-muted order-2 sm:order-1">
             <template v-if="meta.from && meta.to">
-                Showing <span class="font-medium text-gray-700">{{ meta.from }}</span>–<span class="font-medium text-gray-700">{{ meta.to }}</span>
-                of <span class="font-medium text-gray-700">{{ meta.total }}</span> results
+                Showing <span class="font-semibold text-ink-secondary">{{ meta.from }}</span>–<span class="font-semibold text-ink-secondary">{{ meta.to }}</span>
+                of <span class="font-semibold text-ink-secondary">{{ meta.total }}</span>
             </template>
             <template v-else>
-                <span class="font-medium text-gray-700">{{ meta.total }}</span> results
+                <span class="font-semibold text-ink-secondary">{{ meta.total }}</span> results
             </template>
         </p>
         <div class="flex items-center gap-1 order-1 sm:order-2">
@@ -48,12 +49,12 @@ const safeLinks = computed(() => {
                     :is="link.url ? Link : 'span'"
                     :href="link.url ?? undefined"
                     :class="[
-                        'inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors',
+                        'inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-xs font-medium transition-all duration-100',
                         link.active
-                            ? 'bg-indigo-600 text-white shadow-sm'
+                            ? 'bg-brand-600 text-white shadow-sm'
                             : link.url
-                                ? 'text-gray-600 hover:bg-gray-100'
-                                : 'text-gray-300 cursor-not-allowed',
+                                ? 'text-ink-secondary hover:bg-surface-subtle hover:text-ink'
+                                : 'text-ink-faint cursor-not-allowed',
                     ]"
                     v-html="link.label"
                     preserve-scroll

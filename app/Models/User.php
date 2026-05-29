@@ -26,11 +26,26 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
     use HasWallet;
 
     protected $fillable = [
-        'tenant_id', 'name', 'email', 'password', 'phone', 'avatar',
-        'status', 'account_status', 'referral_code', 'referred_by', 'loyalty_points',
-        'two_factor_enabled', 'two_factor_secret', 'two_factor_recovery_codes',
-        'two_factor_confirmed_at', 'preferences', 'timezone', 'locale',
-        'last_login_at', 'last_login_ip',
+        'tenant_id',
+        'name',
+        'email',
+        'password',
+        'phone',
+        'avatar',
+        'status',
+        'account_status',
+        'referral_code',
+        'referred_by',
+        'loyalty_points',
+        'two_factor_enabled',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_confirmed_at',
+        'preferences',
+        'timezone',
+        'locale',
+        'last_login_at',
+        'last_login_ip',
     ];
 
     protected $hidden = ['password', 'remember_token', 'two_factor_secret'];

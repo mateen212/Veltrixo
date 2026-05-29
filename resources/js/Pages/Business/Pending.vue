@@ -1,37 +1,27 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 </script>
 
 <template>
-    <Head title="Registration Under Review — Veltrixo" />
-
-    <div class="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center p-4">
+    <Head title="Verification Pending" />
+    <div class="min-h-screen flex items-center justify-center bg-surface-muted px-4">
         <div class="w-full max-w-md text-center">
-            <!-- Icon -->
-            <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
-                <svg class="h-10 w-10 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div class="card p-10 space-y-5">
+                <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 ring-1 ring-amber-200 mx-auto">
+                    <svg class="h-7 w-7 text-amber-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                </div>
+                <h1 class="text-xl font-bold text-ink font-display">Verification Pending</h1>
+                <p class="text-sm text-ink-muted leading-relaxed max-w-xs mx-auto">
+                    Your business registration is under review. We'll notify you once it's approved — usually within 24 hours.
+                </p>
+                <div class="pt-2">
+                    <Link :href="route('logout')" method="post" as="button" class="btn btn-outline btn-sm">
+                        Sign Out
+                    </Link>
+                </div>
             </div>
-
-            <h1 class="text-2xl font-bold text-slate-800 mb-3">Registration Under Review</h1>
-
-            <p class="text-slate-600 mb-4">
-                Thank you for registering! Our team will review your application and you will receive an email
-                within <strong>24–48 hours</strong> once your business is approved.
-            </p>
-
-            <p class="text-slate-500 text-sm mb-8">
-                In the meantime, feel free to <a href="/contact" class="text-indigo-600 hover:underline">contact support</a>
-                if you have any questions.
-            </p>
-
-            <a
-                :href="route('home')"
-                class="inline-block bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition"
-            >
-                Back to Home
-            </a>
         </div>
     </div>
 </template>
