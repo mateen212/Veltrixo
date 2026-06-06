@@ -39,8 +39,11 @@ class PreventCrossTenantAccess
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
+            // Build redirect URL using the current request scheme so we don't
+            // accidentally redirect between http/https and create loops.
+            $scheme = $request->getScheme();
             $correctUrl = $user->tenant_id
-                ? 'http://' . (optional(\App\Models\Tenant::find($user->tenant_id))->subdomain ?? '') . '.' . config('tenancy.app_domain') . '/login'
+                ? $scheme . '://' . (optional(\App\Models\Tenant::find($user->tenant_id))->subdomain ?? '') . '.' . config('tenancy.app_domain') . '/login'
                 : route('login');
 
             return redirect($correctUrl)->withErrors([

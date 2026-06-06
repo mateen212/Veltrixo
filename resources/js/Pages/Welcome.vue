@@ -229,10 +229,10 @@ const navOpen = ref(false)
                 </p>
 
                 <div :class="['mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center hero-text hero-text-delay-3', heroVisible && 'visible']">
-                    <Link v-if="canRegister" :href="route('register')"
+                    <Link :href="route('business.register')"
                         class="rounded-xl px-8 py-3.5 text-base font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5 shadow-lg"
                         style="background: linear-gradient(135deg, #4F46E5, #7C3AED); box-shadow: 0 8px 24px -4px rgba(99,102,241,0.4);">
-                        Start Free Trial
+                        Register Your Business
                         <span class="ml-1">→</span>
                     </Link>
                     <a href="#features"

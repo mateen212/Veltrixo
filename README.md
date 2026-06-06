@@ -2,6 +2,26 @@
 
 # Veltrixo
 
+<!-- Status Badges -->
+![Project Status: On Hold](https://shields.io)
+![Development Status: In Development](https://shields.io)
+
+## 📢 Notice: Project Temporarily On Hold
+This project is currently **on hold** regarding major public updates, issue reviews, and pull requests. However, it is still actively **in development** behind the scenes. 
+
+We are working on core architectural changes and will resume public updates as soon as the next major version is ready.
+
+## 🚀 About the Project
+A short, one-sentence description of what your amazing project actually does.
+
+## 🛠️ Current State
+* **Public Contributions:** Paused 🛑
+* **Internal Progress:** Active ⚙️
+* **Estimated Return:** [Insert Month/Year or "TBD"]
+
+## 📬 Contact
+If you have urgent questions, please open a discussion or reach out to the maintainers at [mateenzahid1598@gmail.com].
+
 ### Enterprise Multi-Tenant Recurring Delivery SaaS Platform
 
 [![PHP 8.4](https://img.shields.io/badge/PHP-8.4-blue?logo=php)](https://php.net)

@@ -36,17 +36,16 @@ class AuthenticatedSessionController extends Controller
         $user = $request->user();
 
         $subdomain = optional($user->tenant)->subdomain;
-
         if ($user->hasRole('super_admin')) {
             return redirect()->intended(route('super-admin.dashboard'));
         }
 
-        if (! $subdomain) {
+        if (!$subdomain) {
             return redirect()->intended(route('super-admin.dashboard'));
         }
 
         if ($user->hasRole('admin')) {
-            return redirect()->intended(route('admin.dashboard', ['subdomain' => $subdomain]));
+            return redirect()->to("https://{$subdomain}." . config('tenancy.app_domain') . "/admin/dashboard");
         }
 
         if ($user->hasRole('rider')) {
