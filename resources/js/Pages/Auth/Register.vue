@@ -73,6 +73,9 @@ const submit = () => form.post(route('register'), { onFinish: () => form.reset('
                     Already have an account?
                     <Link :href="route('login')" class="font-semibold text-brand-600 hover:text-brand-700 transition-colors">Sign in</Link>
                 </p>
+                <p class="mt-3 text-xs text-ink-faint border-t border-border-muted pt-3">
+                    Are you registering a business? <Link :href="route('business.register')" class="font-semibold text-brand-600 hover:text-brand-700 transition-colors">Register as a business owner</Link>
+                </p>
 
                 <form @submit.prevent="submit" class="mt-8 space-y-5">
                     <div>

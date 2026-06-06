@@ -76,6 +76,9 @@ const submit = () => form.post(route('login'), { onFinish: () => form.reset('pas
                         Register free
                     </Link>
                 </p>
+                <p class="mt-3 text-xs text-ink-faint border-t border-border-muted pt-3">
+                    Are you registering a business? <Link :href="route('business.register')" class="font-semibold text-brand-600 hover:text-brand-700 transition-colors">Register your business</Link>
+                </p>
 
                 <div v-if="status" class="mt-4 rounded-xl bg-emerald-50 ring-1 ring-emerald-200 px-4 py-3 text-sm text-emerald-700">
                     {{ status }}
